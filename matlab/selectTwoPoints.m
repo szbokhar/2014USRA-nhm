@@ -52,6 +52,8 @@ function boxes = selectTwoPoints(fname, tolerance, r0,r1)
     [labeled, count] = bwlabel(newimg);
     boxes = zeros(count,6);
 
+    imshow(newimg)
+
     % Get rectangular bounding box for connected component
     for i = 1:count
         [r,c] = find(labeled==i);

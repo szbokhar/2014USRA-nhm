@@ -59,24 +59,37 @@ function newimg = texton(fname, box)
     % Get positions of clicks
     imshow(img);
     clicks = ginput();
-    posBack = round(clicks(1,:));
-    posFront = round(clicks(2,:));
-    bx = posBack(1);
-    by = posBack(2);
-    fx = posFront(1);
-    fy = posFront(2);
-    close all;
+    [n d] = size(clicks);
 
-    % Get Background and Foreground sample sets
-    bsample = stack((by-box):(by+box),(bx-box):(bx+box),:);
-    fsample = stack((fy-box):(fy+box),(fx-box):(fx+box),:);
-    bs = reshape(bsample,(box*2+1)^2,18);
-    fs = reshape(fsample,(box*2+1)^2,18);
+    bs = [];
+    for i = 1:n
+        bx = round(clicks(i,1));
+        by = round(clicks(i,2));
+        bsample = stack((by-box):(by+box),(bx-box):(bx+box),:);
+        temp = reshape(bsample,(box*2+1)^2,18);
+        bs = [bs; temp];
+        disp('bclick');
+    end
+
+    clicks = ginput();
+    [n d] = size(clicks);
+
+    fs = [];
+    for i = 1:n
+        fx = round(clicks(i,1));
+        fy = round(clicks(i,2));
+        fsample = stack((fy-box):(fy+box),(fx-box):(fx+box),:);
+        temp = reshape(fsample,(box*2+1)^2,18);
+        fs = [fs; temp];
+        disp('fclick');
+    end
+
     bs(:,19) = 0;
     fs(:,19) = 1;
-    data = [bs;fs];
+    data = [bs;fs]
 
     % Train svm
+    disp('Training SVM')
     machine = svmtrain(data(:,1:18), data(:,19));
 
     % Classify all points
@@ -91,5 +104,4 @@ function newimg = texton(fname, box)
         end
         disp(strcat('Row', num2str(y)));
     end
-
 
