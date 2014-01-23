@@ -2,9 +2,9 @@ function boxes = selectTwoPoints(fname, tolerance, r0,r1)
     % Load image and prompt for two clicks
     img = imread(fname);
     imshow(img);
-    clicks = ginput();
 
     % Get positions of clicks
+    clicks = ginput();
     posBack = round(clicks(1,:));
     posFront = round(clicks(2,:));
     bx = posBack(1);
