@@ -1,4 +1,4 @@
-function [bsample, fsample, img, stack] = texton(fname, box)
+function newimg = texton(fname, box)
     % Load image and prompt for two clicks
     img = imread(fname);
 
@@ -70,6 +70,26 @@ function [bsample, fsample, img, stack] = texton(fname, box)
     % Get Background and Foreground sample sets
     bsample = stack((by-box):(by+box),(bx-box):(bx+box),:);
     fsample = stack((fy-box):(fy+box),(fx-box):(fx+box),:);
-    bsample = reshape(bsample,(box*2+1)^2,18);
-    fsample = reshape(fsample,(box*2+1)^2,18);
+    bs = reshape(bsample,(box*2+1)^2,18);
+    fs = reshape(fsample,(box*2+1)^2,18);
+    bs(:,19) = 0;
+    fs(:,19) = 1;
+    data = [bs;fs];
+
+    % Train svm
+    machine = svmtrain(data(:,1:18), data(:,19));
+
+    % Classify all points
+    [h w] = size(img(:,:,1));
+    newimg = zeros([h w]);
+
+    for y = 1:h
+        for x = 1:w
+            sample = reshape(stack(y,x,:),1,18);
+            class = svmclassify(machine,sample);
+            newimg(y,x) = class;
+        end
+        disp(strcat('Row', num2str(y)));
+    end
+
 
