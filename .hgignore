@@ -1,5 +1,8 @@
 syntax: glob
 
+.hsenv/*
 .*.swp
 *.pyc
+*.hi
+*.o
 .DS_Store
