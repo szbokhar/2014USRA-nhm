@@ -18,6 +18,7 @@ function [data, stack] = gendata(fname)
     k_g4X = imfilter(k_g4,grad_x);
     k_g3Y = imfilter(k_g3,grad_y);
     k_g4Y = imfilter(k_g4,grad_y);
+    img = double(img)/255;
     cvt = makecform('srgb2lab');
     lab = applycform(img, cvt);
     lab = double(lab);
@@ -63,3 +64,10 @@ function [data, stack] = gendata(fname)
     stack = stack(9:(h-9), 9:(w-9),:);
     [h w d] = size(stack);
     data = reshape(stack, h*w, d);
+
+    for i=1:fcount
+        low = min(data(:,i));
+        high = max(data(:,i));
+        data(:,i) = (data(:,i)-low)/(high-low);
+        stack(:,:,i) = (stack(:,:,i)-low)/(high-low);
+    end
