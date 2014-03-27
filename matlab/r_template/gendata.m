@@ -26,21 +26,29 @@ function [data, stack] = gendata(fname)
     gfilters = {k_g1, k_g2, k_g3};
     lfilters = {k_g1L, k_g2L, k_g3L, k_g4L};
     xyfilters = {k_g3X, k_g4X, k_g3Y, k_g4Y};
-    fcount = 9;
+    fcount = 11;
 
     % Setup storage to response to filters
     count = 1;
     responses{fcount} = ones(size(img(:,:,1)));
 
     % Run filters
-    for j=1:3
+    for j=1:1
         for i=1:3
             neww = imfilter(lab(:,:,j),gfilters{i});
-            % imshow(neww, [min(neww(:)) max(neww(:))]);
-            % waitforbuttonpress
             responses{count} = neww;
             count = count+1;
         end
+    end
+    for i=1:4
+        neww = imfilter(lab(:,:,1),lfilters{i});
+        responses{count} = neww;
+        count = count+1;
+    end
+    for i=1:4
+        neww = imfilter(lab(:,:,1),xyfilters{i});
+        responses{count} = neww;
+        count = count+1;
     end
 
     % Store responses in HxWx18 dimentional array
