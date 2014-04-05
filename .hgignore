@@ -5,4 +5,5 @@ syntax: glob
 *.pyc
 *.hi
 *.o
+matlab/other/*
 .DS_Store
