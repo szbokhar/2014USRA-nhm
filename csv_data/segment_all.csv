@@ -1,0 +1,7 @@
+Filename, True Positives, False Positives, True Negatives, Reposition Box, Enlarge Box, Shrink Box
+G1_166.jpg, 53, 1, 14, 6, 6, 1
+G1_168.jpg, 119, 0, 1, 6, 20, 12
+G1_176.jpg, 172, 13, 0, 7, 19, 8
+Ma43255.jpg, 86, 0, 3, 4, 15, 0
+Ma43253.jpg, 92, 8, 0, 28, 27, 0
+Ma43259.jpg, 33, 0, 39, 5, 5, 0
