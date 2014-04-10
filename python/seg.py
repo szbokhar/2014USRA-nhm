@@ -15,7 +15,7 @@ class MainWindow(QtGui.QMainWindow):
 
         imagePane = ImagePanel()
 
-        toolPane = ToolPanel(imagePane)
+        toolPane = ToolPanel(self, imagePane)
 
         splitter1 = QtGui.QSplitter(QtCore.Qt.Horizontal)
         splitter1.addWidget(toolPane)
@@ -35,7 +35,7 @@ class MainWindow(QtGui.QMainWindow):
 
 class ToolPanel(QtGui.QFrame):
 
-    def __init__(self, img):
+    def __init__(self, window, img):
         super(ToolPanel, self).__init__()
         self.pnlImg = img
         self.currentPath = "."
@@ -61,6 +61,8 @@ class ToolPanel(QtGui.QFrame):
         self.btnCancelBug.setMinimumHeight(50)
         self.btnCancelBug.setStatusTip("Cancel bug selection")
 
+        self.pnlImg.newTemplateSignal.connect(self.newTemplateSelected)
+
         frmEmpty = QtGui.QFrame(self)
 
 
@@ -84,15 +86,21 @@ class ToolPanel(QtGui.QFrame):
             self.pnlImg.loadImage(fname)
 
     def selectTemplate(self):
-        print "Ff"
-        self.pnlImg.tplateSel = 1 - self.pnlImg.tplateSel
+        self.pnlImg.selectNewTemplate()
+
+    def newTemplateSelected(self, ev):
+        self.btnSelectTemplate.setText("Reset Template")
 
 class ImagePanel(QtGui.QLabel):
+
+    templateSel = 0
+    template = (0,0,0,0)
+
+    newTemplateSignal = QtCore.Signal(str)
 
     def __init__(self):
         super(ImagePanel, self).__init__()
         self.setMaximumSize(924,720)
-        self.tplateSel = 0
         self.show()
 
     def loadImage(self, fname):
@@ -101,9 +109,38 @@ class ImagePanel(QtGui.QLabel):
         self.pix = self.pix.scaled(sz.width(), sz.height(), QtCore.Qt.KeepAspectRatio)
         self.setPixmap(self.pix)
 
-    def mousePressEvent(self, event):
-        print event.pos()
+    def selectNewTemplate(self):
+        self.templateSel = 1
+        template = (0,0,0,0)
+        self.repaint()
 
+    def mousePressEvent(self, ev):
+        if self.templateSel:
+            (x1,y1,x2,y2) = self.template
+            self.template = (ev.x(), ev.y(), x2, y2)
+
+    def mouseReleaseEvent(self, ev):
+        if self.templateSel:
+            (x1,y1,x2,y2) = self.template
+            self.template = (x1, y1, ev.x(), ev.y())
+            self.templateSel = 0
+            self.newTemplateSignal.emit("New template selected")
+
+    def mouseMoveEvent(self, ev):
+        if self.templateSel:
+            (x1,y1,x2,y2) = self.template
+            self.template = (x1, y1, ev.x(), ev.y())
+            self.repaint()
+
+    def paintEvent(self, ev):
+        super(ImagePanel, self).paintEvent(ev)
+
+        qp = QtGui.QPainter()
+        qp.begin(self)
+        qp.setPen(QtGui.QColor(255,0,0))
+        (x1,y1,x2,y2) = self.template
+        qp.drawRect(x1,y1,x2-x1, y2-y1)
+        qp.end()
 
 def main():
 
