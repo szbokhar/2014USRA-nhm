@@ -1,4 +1,4 @@
-function [rankings, placed, placed_cut] = random_template_scale(fname, pcount, off_x, off_y, scales)
+function [rankings, placed, placed_cut] = random_template_interact(fname, pcount, off_x, off_y, scales)
 
     % Load image and get data
     raw_image = imread(fname);
