@@ -33,8 +33,8 @@ class ToolPanel(QtGui.QFrame):
         self.btnCancelBug.setStatusTip("Cancel bug selection")
         self.btnCancelBug.setEnabled(False)
 
-        self.btnOther = QtGui.QPushButton("Other")
-        self.btnOther.setMinimumHeight(50)
+        self.btnSelectBox = QtGui.QPushButton("Select Exsisting Box")
+        self.btnSelectBox.setMinimumHeight(50)
 
         # Empty Space
         frmEmpty = QtGui.QFrame(self)
@@ -45,7 +45,7 @@ class ToolPanel(QtGui.QFrame):
         content.addWidget(self.btnSelectTemplate, 1, 0, 1, 2)
         content.addWidget(self.btnNextBug, 2, 0)
         content.addWidget(self.btnCancelBug, 2, 1)
-        content.addWidget(self.btnOther, 3, 0, 1, 2)
+        content.addWidget(self.btnSelectBox, 3, 0, 1, 2)
         content.addWidget(frmEmpty, 4, 0, 1, 2)
 
         # Finish up pane
@@ -55,9 +55,9 @@ class ToolPanel(QtGui.QFrame):
     # Setup slots for signals from the image pane
     def setImagePane(self, img):
         self.btnOpenImage.clicked.connect(self.openFile)
-        img.sigNewTemplate.connect(self.newTemplateSelected)
+        img.sigTemplate.connect(self.newTemplateSelected)
         img.sigBugSelection.connect(self.bugSelection)
-        self.btnOther.clicked.connect(self.notifyData)
+        img.sigBoxSelection.connect(self.boxSelection)
 
     # Open a new image file
     def openFile(self):
@@ -71,18 +71,38 @@ class ToolPanel(QtGui.QFrame):
 
     # Called when the user has finished selecting a new template
     def newTemplateSelected(self, ev):
-        self.btnSelectTemplate.setText("Reset Template")
+        if ev == "ButtonPressed":
+            self.btnNextBug.setEnabled(False)
+            self.btnCancelBug.setEnabled(False)
+            self.btnSelectBox.setEnabled(False)
+        elif ev == "TemplateSelected":
+            self.btnSelectTemplate.setText("Reset Template")
+            self.btnNextBug.setEnabled(True)
+            self.btnSelectBox.setEnabled(True)
 
     def bugSelection(self, result):
         if result == "Confirmed":
             self.btnCancelBug.setEnabled(True)
-            self.btnNextBug.setText("Next\nBug")
+            self.btnNextBug.setText("Confirm\nBug")
+            self.btnNextBug.setEnabled(True)
         elif result == "Cancelled":
             self.btnCancelBug.setEnabled(False)
             self.btnNextBug.setText("Select\nBug")
+            self.btnSelectTemplate.setEnabled(True)
+            self.btnSelectBox.setEnabled(True)
         elif result == "Start":
             self.btnCancelBug.setEnabled(True)
-            self.btnNextBug.setText("Next\nBug")
+            self.btnNextBug.setText("Confirm\nBug")
+            self.btnSelectTemplate.setEnabled(False)
+            self.btnSelectBox.setEnabled(False)
+            self.btnNextBug.setEnabled(False)
 
-    def notifyData(self):
-        self.data.random()
+    def boxSelection(self, result):
+        if result == "BoxSelectOn":
+            self.btnSelectBox.setText("Cancel Selection")
+            self.btnSelectTemplate.setEnabled(False)
+            self.btnNextBug.setEnabled(False)
+        elif result == "BoxSelectOff":
+            self.btnSelectBox.setText("Select Exsisting Box")
+            self.btnSelectTemplate.setEnabled(True)
+            self.btnNextBug.setEnabled(True)
