@@ -5,7 +5,7 @@ from Segmentation import *
 class ImagePanel(QtGui.QLabel):
 
     # Enum for interaction modes
-    Nothing, TemplateSelect, SpeciminSelect, BoxSelect = range(4)
+    Nothing, TemplateSelect, SpeciminSelect, BoxSelect, PanCB, ResizeCB = range(6)
 
     # Current intercation mode
     _paneMode = Nothing
@@ -83,6 +83,9 @@ class ImagePanel(QtGui.QLabel):
             self.data.cancelBox()
             self.repaint()
             self.sigBugSelection.emit("Cancelled")
+        elif self._paneMode == self.BoxSelect:
+            self.data.cancelBox()
+            self.repaint()
 
     def toggleSelectBox(self):
         if self._paneMode == self.Nothing:
@@ -98,7 +101,46 @@ class ImagePanel(QtGui.QLabel):
     # Virtual methods
     def mousePressEvent(self, ev):
         s = self._imageScale
-        if self._paneMode == ImagePanel.TemplateSelect:
+        mx = s*ev.x()
+        my = s*ev.y()
+        c = 10
+        if self.data.getCurrentBox() != None and isPointInBox(mx,my,c,self.data.getCurrentBox()):
+            (x1,y1,x2,y2) = self.data.getCurrentBox()
+            self._oldPaneMode = self._paneMode
+
+            if isPointIn(mx,my,x1-c,y1-c,x1+c,y1+c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),0)
+            if isPointIn(mx,my,x2-c,y2-c,x2+c,y2+c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),1)
+
+            elif isPointIn(mx,my,x2-c,y1-c,x2+c,y1+c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),2)
+            elif isPointIn(mx,my,x1-c,y2-c,x1+c,y2+c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),3)
+
+            elif isPointIn(mx,my,x1+c,y1-c,x2-c,y1+c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),4)
+            elif isPointIn(mx,my,x1+c,y2-c,x2-c,y2+c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),5)
+
+            elif isPointIn(mx,my,x1-c,y1+c,x1+c,y2-c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),6)
+            elif isPointIn(mx,my,x2-c,y1+c,x2+c,y2-c):
+                self._paneMode = ImagePanel.ResizeCB
+                self.data.startCBResize(s*ev.x(), s*ev.y(),7)
+
+            elif isPointIn(mx,my,x1+c,y1+c,x2-c,y2-c):
+                self._paneMode = ImagePanel.PanCB
+                self.data.startCBPan(s*ev.x(), s*ev.y())
+
+        elif self._paneMode == ImagePanel.TemplateSelect:
             (x1,y1,x2,y2) = self.data.templateBox()
             self.data.templateBox((s*ev.x(), s*ev.y(), x2, y2))
             self.setMouseTracking(False)
@@ -121,10 +163,22 @@ class ImagePanel(QtGui.QLabel):
             self.sigTemplate.emit("TemplateSelected")
             self.data.confirmTemplate()
             self.setMouseTracking(True)
+        elif self._paneMode == ImagePanel.PanCB:
+            self._paneMode = self._oldPaneMode
+            self.data.endCBPan()
+        elif self._paneMode == ImagePanel.ResizeCB:
+            self._paneMode = self._oldPaneMode
+            self.data.endCBResize()
 
     def mouseMoveEvent(self, ev):
         s = self._imageScale
-        if self._paneMode == ImagePanel.TemplateSelect:
+        if self._paneMode == ImagePanel.PanCB:
+            self.data.doCBPan(s*ev.x(), s*ev.y())
+            self.repaint()
+        if self._paneMode == ImagePanel.ResizeCB:
+            self.data.doCBResize(s*ev.x(), s*ev.y())
+            self.repaint()
+        elif self._paneMode == ImagePanel.TemplateSelect:
             (x1,y1,x2,y2) = self.data.templateBox()
             self.data.templateBox((x1, y1, s*ev.x(), s*ev.y()))
             self.repaint()
@@ -174,3 +228,6 @@ class ImagePanel(QtGui.QLabel):
 
 def isPointIn(x,y,x1,y1,x2,y2):
     return x > x1 and x < x2 and y > y1 and y < y2
+
+def isPointInBox(x,y,pad,(x1,y1,x2,y2)):
+    return isPointIn(x,y,x1-pad,y1-pad,x2+pad,y2+pad)

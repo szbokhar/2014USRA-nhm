@@ -36,6 +36,9 @@ class ToolPanel(QtGui.QFrame):
         self.btnSelectBox = QtGui.QPushButton("Select Exsisting Box")
         self.btnSelectBox.setMinimumHeight(50)
 
+        self.btnSaveBoxes = QtGui.QPushButton("Save Boxes to File")
+        self.btnSaveBoxes.setMinimumHeight(50)
+
         # Empty Space
         frmEmpty = QtGui.QFrame(self)
 
@@ -46,7 +49,8 @@ class ToolPanel(QtGui.QFrame):
         content.addWidget(self.btnNextBug, 2, 0)
         content.addWidget(self.btnCancelBug, 2, 1)
         content.addWidget(self.btnSelectBox, 3, 0, 1, 2)
-        content.addWidget(frmEmpty, 4, 0, 1, 2)
+        content.addWidget(self.btnSaveBoxes, 4, 0, 1, 2)
+        content.addWidget(frmEmpty, 5, 0, 1, 2)
 
         # Finish up pane
         self.setLayout(content)
@@ -55,6 +59,7 @@ class ToolPanel(QtGui.QFrame):
     # Setup slots for signals from the image pane
     def setImagePane(self, img):
         self.btnOpenImage.clicked.connect(self.openFile)
+        self.btnSaveBoxes.clicked.connect(self.saveFile)
         img.sigTemplate.connect(self.newTemplateSelected)
         img.sigBugSelection.connect(self.bugSelection)
         img.sigBoxSelection.connect(self.boxSelection)
@@ -68,6 +73,14 @@ class ToolPanel(QtGui.QFrame):
             fpath = fname.split("/")
             self.currentPath = "/".join(fpath[0:-1])
             self.sigOpenFile.emit(fname)
+
+    # Save a csv file
+    def saveFile(self):
+        fname, _ = QtGui.QFileDialog.getSaveFileName(self, "Save Boxes CSV File",
+                        self.currentPath)
+
+        if fname != "":
+            self.data.saveCSV(fname)
 
     # Called when the user has finished selecting a new template
     def newTemplateSelected(self, ev):
@@ -100,9 +113,13 @@ class ToolPanel(QtGui.QFrame):
     def boxSelection(self, result):
         if result == "BoxSelectOn":
             self.btnSelectBox.setText("Cancel Selection")
+            self.btnCancelBug.setText("Delete\nBox")
             self.btnSelectTemplate.setEnabled(False)
             self.btnNextBug.setEnabled(False)
+            self.btnCancelBug.setEnabled(True)
         elif result == "BoxSelectOff":
             self.btnSelectBox.setText("Select Exsisting Box")
+            self.btnCancelBug.setText("Cancel\nSelection")
             self.btnSelectTemplate.setEnabled(True)
             self.btnNextBug.setEnabled(True)
+            self.btnCancelBug.setEnabled(False)

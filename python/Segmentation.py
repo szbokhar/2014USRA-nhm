@@ -85,6 +85,15 @@ class SegmentationData:
         features.append(filters.sobel(im8, 1))
         self._features = dstack(features)
 
+    def saveCSV(self, fname):
+        f = open(fname, 'w')
+        f.write("\"Source Image\", %s\n" % self._imageFilename)
+
+        i = 1
+        for (x1,y1,x2,y2) in self._boxes:
+            f.write("\"Box %d\", %d, %d, %d, %d\n" % (i,x1,y1,x2,y2))
+            i = i+1
+
     def boxes(self):
         return self._boxes
 
@@ -125,3 +134,51 @@ class SegmentationData:
                 del self._boxes[i]
                 break
 
+    def startCBPan(self, mx, my):
+        if self._currentBox != None:
+            self._oldPos = (mx,my)
+
+    def doCBPan(self, mx,my):
+        if self._currentBox != None:
+            (ox,oy) = self._oldPos
+            dx = mx - ox
+            dy = my - oy
+            (x1,y1,x2,y2) = self._currentBox
+            self._currentBox = (x1+dx,y1+dy,x2+dx,y2+dy)
+            self._oldPos = (mx,my)
+
+    def endCBPan(self):
+        self._oldPos = None
+
+    def startCBResize(self, mx, my, kind):
+        if self._currentBox != None:
+            self._oldPos = (mx,my)
+            self._resizeKind = kind
+
+    def doCBResize(self, mx,my):
+        if self._currentBox != None:
+            (ox,oy) = self._oldPos
+            dx = mx - ox
+            dy = my - oy
+            (x1,y1,x2,y2) = self._currentBox
+            if self._resizeKind == 0:
+                self._currentBox = (x1+dx,y1+dy,x2,y2)
+            elif self._resizeKind == 1:
+                self._currentBox = (x1,y1,x2+dx,y2+dy)
+            elif self._resizeKind == 2:
+                self._currentBox = (x1,y1+dy,x2+dx,y2)
+            elif self._resizeKind == 3:
+                self._currentBox = (x1+dx,y1,x2,y2+dy)
+            elif self._resizeKind == 4:
+                self._currentBox = (x1,y1+dy,x2,y2)
+            elif self._resizeKind == 5:
+                self._currentBox = (x1,y1,x2,y2+dy)
+            elif self._resizeKind == 6:
+                self._currentBox = (x1+dx,y1,x2,y2)
+            elif self._resizeKind == 7:
+                self._currentBox = (x1,y1,x2+dx,y2)
+
+            self._oldPos = (mx,my)
+
+    def endCBResize(self):
+        self._oldPos = None
