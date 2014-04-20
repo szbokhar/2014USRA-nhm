@@ -23,13 +23,16 @@ from numpy import *
 from pylab import *
 from scipy.ndimage import filters
 from math import *
+import logging
 import random
 
 class SegmentationData:
     _imageFilename = ""
     _imageSize = (0,0)
     _boxes = []
+    _boxCount = 0
     _currentBox = None
+    _currentBoxId = -1
 
     _templateBox = (0,0,0,0)
     _template = []
@@ -40,19 +43,33 @@ class SegmentationData:
     stepy = 15
     scales = [0.75, 1.0, 1.25, 1.5]
 
+    def __init__(self, logfile=None):
+        if logfile:
+            logging.basicConfig(filename=logfile, level=logging.DEBUG, format="- %(message)s")
+
+        logging.info("Using logfile %s" % logfile)
+
     def newBox(self):
         self._currentBox = (0,0,0,0)
+        self._currentBoxId = self._boxCount
 
     def goodBox(self):
         if self._currentBox != None:
-            self._boxes.append(self._currentBox)
+            self._boxes.append((self._currentBoxId, self._currentBox))
+            (x1,y1,x2,y2) = self._currentBox
+            logging.debug("Place box #%s on specemin at (%d,%d,%d,%d)"
+                % (self._currentBoxId, x1,y1,x2,y2))
+            self._boxCount += 1
             self._currentBox = None
+            self._currentBoxId = -1
 
     def cancelBox(self):
         self._currentBox = None
+        logging.debug("Delete active box #%d" % self._currentBoxId)
 
     def resetTemplate(self):
         self._templateBox = (0,0,0,0)
+        logging.debug("Reset Template")
 
     def templateBox(self, tplate=None):
         if tplate != None:
@@ -66,6 +83,7 @@ class SegmentationData:
         (x1,y1,x2,y2) = self._templateBox
         self._templateBox = (min(x1,x2), min(y1,y2), max(x1,x2), max(y1,y2))
         (x1,y1,x2,y2) = self._templateBox
+        logging.debug("New template at (%d,%d,%d,%d)" % self._templateBox)
         w = int(x2-x1)/2
         h = int(y2-y1)/2
         for i in range(self.pcount):
@@ -81,6 +99,7 @@ class SegmentationData:
         self.templateBox((0,0,0,0))
         self._boxes = []
         self._currentBox = None
+        logging.info("Load image %s" % fname)
 
         self._image = array(Image.open(fname).convert('L'), dtype='f')/255
         (h,w) = shape(self._image)
@@ -109,10 +128,10 @@ class SegmentationData:
         f = open(fname, 'w')
         f.write("\"Source Image\", %s\n" % self._imageFilename)
 
-        i = 1
-        for (x1,y1,x2,y2) in self._boxes:
+        for (i, (x1,y1,x2,y2)) in self._boxes:
             f.write("\"Box %d\", %d, %d, %d, %d\n" % (i,x1,y1,x2,y2))
-            i = i+1
+
+        logging.info("Saving CSV %s" % fname)
 
     def boxes(self):
         return self._boxes
@@ -121,6 +140,7 @@ class SegmentationData:
         return self._currentBox
 
     def currentBugClickAt(self, mx, my):
+        logging.debug("New specemin click at (%d, %d)" % (mx, my))
         (x1,y1,x2,y2) = self.templateBox()
         tw = int((x2-x1)/2)
         th = int((y2-y1)/2)
@@ -140,26 +160,31 @@ class SegmentationData:
                         scores.append((sum(diff*diff), s,  mx+ix, my+iy))
         (_, s, bestx, besty) = min(scores)
         self._currentBox = (bestx-tw*s, besty-th*s, bestx+tw*s, besty+th*s)
+        logging.debug("Box placed automatically at (%d, %d, %d, %d)"
+            % self._currentBox)
 
     def chooseBox(self,pos):
         (mx,my) = pos
 
-        if self._currentBox != None:
-            self._boxes.append(self._currentBox)
+        if self._currentBox != None and self._currentBox != (0,0,0,0):
+            self._boxes.append((self._currentBoxId, self._currentBox))
 
         for i in range(len(self._boxes)):
-            (x1,y1,x2,y2) = self._boxes[i]
+            (j, (x1,y1,x2,y2)) = self._boxes[i]
             if mx > x1 and mx < x2 and my > y1 and my < y2:
-                self._currentBox = self._boxes[i]
+                self._currentBox = (x1,y1,x2,y2)
+                self._currentBoxId = j
+                logging.debug("User selected box #%d" % j)
                 del self._boxes[i]
                 break
 
     def startCBPan(self, mx, my):
-        if self._currentBox != None:
+        if self._currentBox != None and self._currentBox != (0,0,0,0):
             self._oldPos = (mx,my)
+            logging.debug("Pan box #%d" % self._currentBoxId)
 
     def doCBPan(self, mx,my):
-        if self._currentBox != None:
+        if self._currentBox != None and self._currentBox != (0,0,0,0):
             (ox,oy) = self._oldPos
             dx = mx - ox
             dy = my - oy
@@ -171,12 +196,13 @@ class SegmentationData:
         self._oldPos = None
 
     def startCBResize(self, mx, my, kind):
-        if self._currentBox != None:
+        if self._currentBox != None and self._currentBox != (0,0,0,0):
             self._oldPos = (mx,my)
             self._resizeKind = kind
+            logging.debug("Resize box #%d" % self._currentBoxId)
 
     def doCBResize(self, mx,my):
-        if self._currentBox != None:
+        if self._currentBox != None and self._currentBox != (0,0,0,0):
             (ox,oy) = self._oldPos
             dx = mx - ox
             dy = my - oy

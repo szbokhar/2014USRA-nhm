@@ -235,7 +235,7 @@ class ImagePanel(QtGui.QLabel):
         qp.setPen(QtGui.QColor(0,0,255))
 
         for box in self.data.boxes():
-            (x1,y1,x2,y2) = box
+            (_, (x1,y1,x2,y2)) = box
             qp.drawRect(s*x1,s*y1,s*(x2-x1), s*(y2-y1))
 
         qp.setPen(QtGui.QColor(0,255,0))

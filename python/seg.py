@@ -25,19 +25,19 @@ from Segmentation import *
 
 class MainWindow(QtGui.QMainWindow):
 
-    def __init__(self):
+    def __init__(self, fname=None):
         super(MainWindow, self).__init__()
-        self.initUI()
+        self.initUI(fname)
 
     # Initialize UI
-    def initUI(self):
+    def initUI(self, fname=None):
 
         # Setup main content area
         mainWidget = QtGui.QFrame(self)
         mainContent = QtGui.QHBoxLayout(self)
 
         # Setup main panels and segmentation data
-        data = SegmentationData()
+        data = SegmentationData(fname)
         imagePane = ImagePanel(data, self)
         toolPane = ToolPanel(data, self)
 
@@ -64,9 +64,12 @@ class MainWindow(QtGui.QMainWindow):
         self.show()
 
 def main():
+    logfile = None
+    if len(sys.argv) > 1:
+        logfile = sys.argv[1]
 
     app = QtGui.QApplication(sys.argv)
-    ex = MainWindow()
+    ex = MainWindow(logfile)
     sys.exit(app.exec_())
 
 

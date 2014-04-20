@@ -37,7 +37,7 @@ class ToolPanel(QtGui.QFrame):
         # Setup Buttons
         self.btnOpenImage = QtGui.QPushButton("Open Image")
         self.btnOpenImage.setMinimumHeight(50)
-        self.btnOpenImage.setStatusTip("Open a new image of specimines")
+        self.btnOpenImage.setStatusTip("Open a new image of specemins")
 
         self.btnSelectTemplate = QtGui.QPushButton("Select Template")
         self.btnSelectTemplate.setMinimumHeight(50)
