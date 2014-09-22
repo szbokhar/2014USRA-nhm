@@ -248,5 +248,6 @@ class ImagePanel(QtGui.QLabel):
 def isPointIn(x,y,x1,y1,x2,y2):
     return x > x1 and x < x2 and y > y1 and y < y2
 
-def isPointInBox(x,y,pad,(x1,y1,x2,y2)):
+def isPointInBox(x,y,pad,box):
+    (x1,y1,x2,y2) = box
     return isPointIn(x,y,x1-pad,y1-pad,x2+pad,y2+pad)
