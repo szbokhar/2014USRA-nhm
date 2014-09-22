@@ -148,20 +148,6 @@ while(True):
         limg[limg < 12] = 0
         limg = limg/50
 
-        """
-        c = 0.0
-        p = Pt(0,0)
-        for x in range(box_range[0].x, box_range[1].x, 10):
-            for y in range(box_range[0].y, box_range[1].y, 10):
-                if limg[y,x] > 0:
-                    c += limg[y,x]
-                    p += Pt(x*limg[y,x],y*limg[y,x])
-        if c != 0:
-            p = Pt(int(p.x/c), int(p.y/c))
-            m_live = p
-        print(p)
-        """
-
         xlist = []
         ylist = []
         for x in range(box_range[0].x, box_range[1].x, 10):
@@ -172,12 +158,6 @@ while(True):
 
         if xlist:
             m_live = Pt(median_pos(xlist), median_pos(ylist))
-
-
-
-
-
-
 
     amendImage(limg, static_image, m_live, m_static)
 
