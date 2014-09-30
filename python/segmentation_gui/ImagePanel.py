@@ -75,6 +75,7 @@ class ImagePanel(QtGui.QLabel):
         iw = float(self.pix.width())
 
         self.pix = self.pix.scaled(sz.width(), sz.height(), QtCore.Qt.KeepAspectRatio)
+        self.setAlignment(QtCore.Qt.AlignTop)
         self.setPixmap(self.pix)
         lw = float(self.pix.width())
 
