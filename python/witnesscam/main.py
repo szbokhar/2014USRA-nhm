@@ -5,60 +5,67 @@ from Pt import *
 from random import *
 import math
 
-corners = []
-m_live = Pt(0,0)
-m_static = Pt(0,0)
-live_snap = None
-box_range = None
+# Constants
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+BLUE = (255, 0, 0)
 
-goodboxes = []
+# Global variables
+tray_corner_points = []
+mouse_liveview = Pt(0,0)
+mouse_staticview = Pt(0,0)
+background_frame = None
+selection_boundingbox = None
+
+# Valid insect boxes loaded from CSV
+csv_boxes = []
 with open('butterfly_test.csv', 'rb') as csvfile:
     boxes =csv.reader(csvfile, delimiter=',')
     for b in boxes:
         if len(b) >= 5:
-            goodboxes.append([int(i) for i in b[1],b[2],b[3],b[4]])
+            csv_boxes.append([int(i) for i in b[1],b[2],b[3],b[4]])
 
+# Callback for mouse events on the live view
 def mouse_live(ev, x, y, flags, params):
-    global corners
-    global m_live
-    if ev == 4 and len(corners) < 4:
-        corners.append(Pt(x,y))
-    m_live = Pt(x,y)
+    global tray_corner_points
+    global mouse_liveview
+    if ev == 4 and len(tray_corner_points) < 4:
+        tray_corner_points.append(Pt(x,y))
+    mouse_liveview = Pt(x,y)
 
+# Callback form mouse events on the scanned view
 def mouse_static(ev, x, y, flags, params):
-    global m_static
-    m_static = Pt(x,y)
+    global mouse_staticview
+    mouse_staticview = Pt(x,y)
 
+# Markup display image before displaying
 def amendImage(live_image, static_image, lp, sp, pickbox):
-    global corners
+    global tray_corner_points
     global mapvals
-    global live_snap
-    global goodboxes
+    global background_frame
+    global csv_boxes
 
-    if len(corners) < 4:
-        for cl in corners:
-            cv2.circle(live_image, (cl.x, cl.y), 8, (255,0,0))
-        cv2.line(live_image, (lp.x-10, lp.y), (lp.x+10, lp.y), (0,255,0))
-        cv2.line(live_image, (lp.x, lp.y-10), (lp.x, lp.y+10), (0,255,0))
+    if len(tray_corner_points) < 4:
+        for cl in tray_corner_points:
+            cv2.circle(live_image, (cl.x, cl.y), 8, BLUE)
+        cv2.line(live_image, (lp.x-10, lp.y), (lp.x+10, lp.y), GREEN)
+        cv2.line(live_image, (lp.x, lp.y-10), (lp.x, lp.y+10), GREEN)
 
-    elif len(corners) == 4:
-        l_height = live_image.shape[0]
-        l_width = live_image.shape[1]
+    elif len(tray_corner_points) == 4:
+        (l_height, l_width) = live_image.shape
         (s_height, s_width, _) = static_image.shape
-        mir = Pt(float(sp.x)/s_width, float(sp.y)/s_height)
-        (u,v) = compute_mapvals(corners, s_width, s_height, lp)
-
+        (u,v) = compute_mapvals(tray_corner_points, s_width, s_height, lp)
 
         # cv2.line(static_image, (u-10, v), (u+10, v), (0,255,0))
         # cv2.line(static_image, (u, v-10), (u, v+10), (0,255,0))
 
-        cv2.line(live_image, (lp.x-10, lp.y), (lp.x+10, lp.y), (0,255,0))
-        cv2.line(live_image, (lp.x, lp.y-10), (lp.x, lp.y+10), (0,255,0))
-        cv2.line(live_image, (lp.x-10, lp.y-10), (lp.x+10, lp.y+10), (255,255,255))
-        cv2.line(live_image, (lp.x+10, lp.y-10), (lp.x-10, lp.y+10), (255,255,255))
+        cv2.line(live_image, (lp.x-10, lp.y), (lp.x+10, lp.y), GREEN)
+        cv2.line(live_image, (lp.x, lp.y-10), (lp.x, lp.y+10), GREEN)
+        cv2.line(live_image, (lp.x-10, lp.y-10), (lp.x+10, lp.y+10), WHITE)
+        cv2.line(live_image, (lp.x+10, lp.y-10), (lp.x-10, lp.y+10), WHITE)
 
         if pickbox:
-            for b in goodboxes:
+            for b in csv_boxes:
                 if (u > b[0] and u < b[2] and v > b[1] and v < b[3]):
                     q0 = (b[0], b[1])
                     q1 = (b[2], b[1])
@@ -71,7 +78,7 @@ def amendImage(live_image, static_image, lp, sp, pickbox):
                     break
 
 
-
+# Compute mapping between quadrilateral and square
 def compute_mapvals(points, scalex, scaley, pos):
     [p0, p1, p2, p3] = points
     [p00, p01, p02, p03] = [p0-p0, p1-p0, p2-p0, p3-p0]
@@ -95,6 +102,7 @@ def compute_mapvals(points, scalex, scaley, pos):
 
     return (int(u*scalex), int(v*scaley))
 
+# Find the median of the list
 def median_pos(lst):
     lst.sort()
     for i in range(1,len(lst)):
@@ -119,6 +127,7 @@ def median_pos(lst):
                 break
         return lst[high][0]
 
+# Find return all pixles with value 1 that are connected to the given pixel
 def connected_component(img, pos):
     component = set()
     frontier = set([(pos.x, pos.y)])
@@ -138,24 +147,44 @@ def connected_component(img, pos):
 
     return component
 
+def get_median_position(difference_mask, selection_bounding_box):
+    c = 0.0
+    p = Pt(0,0)
+    xlist = []
+    ylist = []
+    for x in range(selection_boundingbox[0].x, selection_boundingbox[1].x, 10):
+        for y in range(selection_boundingbox[0].y, selection_boundingbox[1].y, 10):
+            if difference_mask[y,x] > 0:
+                c += difference_mask[y,x]
+                xlist.append((x, difference_mask[y,x]))
+                ylist.append((y, difference_mask[y,x]))
+                p += Pt(x*difference_mask[y,x],y*difference_mask[y,x])
+
+    if xlist:
+        return Pt(median_pos(xlist), median_pos(ylist))
+
+    return None
+
+# Setup OpenCV stuff
 cap = cv2.VideoCapture(0)
 cv2.namedWindow('Live')
 cv2.namedWindow('Static')
 frame = None
 cv2.setMouseCallback('Live', mouse_live)
 cv2.setMouseCallback('Static', mouse_static)
-
 static_image_base = cv2.imread('butterfy_test.png', cv2.IMREAD_COLOR)
+
+# Scale down the csv box coordiantes for the loaded scanned image
 (original_height, original_width, _) = static_image_base.shape
 static_image_base = cv2.pyrDown(static_image_base)
 static_image_base = cv2.pyrDown(static_image_base)
 (h,w,_) = static_image_base.shape
 scale = float(w)/original_width
-for i in range(len(goodboxes)):
-    goodboxes[i] = [int(c * scale) for c in goodboxes[i]]
+for i in range(len(csv_boxes)):
+    csv_boxes[i] = [int(c * scale) for c in csv_boxes[i]]
 
 
-
+# Persistant values for the loop
 last_dvalue = 0
 current_dvalue = 0
 stable_run = 0
@@ -167,79 +196,59 @@ while(True):
     # small = cv2.cvtColor(small, cv2.COLOR_BGR2LAB)
     static_image = np.copy(static_image_base)
     small_blur = cv2.GaussianBlur(small, (13,13), 0)
-    avg_pos = Pt(0,0)
-    selection_box = None
-    selection_box_area = 0
+    difference_mask = small
 
-    if live_snap == None:
-        limg = small
-        if len(corners) == 4:
-            live_snap = cv2.GaussianBlur(small, (13,13), 0)
+    if background_frame == None:
+        if len(tray_corner_points) == 4:
+            background_frame = small_blur
             (minx, miny, maxx, maxy) = (1000, 1000, 0, 0)
-            for p in corners:
+            for p in tray_corner_points:
                 minx = p.x if p.x < minx else minx
                 miny = p.y if p.y < miny else miny
                 maxx = p.x if p.x > maxx else maxx
                 maxy = p.y if p.y > maxy else maxy
-            box_range = [Pt(minx,miny), Pt(maxx, maxy)]
+            selection_boundingbox = [Pt(minx,miny), Pt(maxx, maxy)]
 
-    if live_snap != None:
-        limg = np.absolute(np.subtract(live_snap.astype(int), small_blur.astype(int))).astype(np.uint8)
-        (h,w,d) = limg.shape
-        mask = np.zeros((h,w,d), np.uint8)
-        poly = np.array([[p.x, p.y] for p in corners], dtype=np.int32)
-        cv2.drawContours(mask, [poly], 0, (1,1,1), -1)
-        limg = np.add.reduce(np.square(np.multiply(np.float32(limg), mask)), 2)
-        limg = np.sqrt(limg)
-        limg[limg < 12] = 0
-        limg = limg/50
+    if background_frame != None:
+        difference_mask = np.absolute(np.subtract(background_frame.astype(int), small_blur.astype(int))).astype(np.uint8)
+        (h,w,d) = difference_mask.shape
+        polygon_mask = np.zeros((h,w,d), np.uint8)
+        poly = np.array([[p.x, p.y] for p in tray_corner_points], dtype=np.int32)
+        cv2.drawContours(polygon_mask, [poly], 0, (1,1,1), -1)
+        difference_mask = np.add.reduce(np.square(np.multiply(np.float32(difference_mask), polygon_mask)), 2)
+        difference_mask = np.sqrt(difference_mask)
+        difference_mask[difference_mask < 12] = 0
+        difference_mask = difference_mask/50
+
         alp = 0.4
-        current_dvalue = (1-alp)*last_dvalue + alp*math.sqrt(np.sum(limg))
+        current_dvalue = (1-alp)*last_dvalue + alp*math.sqrt(np.sum(difference_mask))
 
         if abs(current_dvalue-last_dvalue) < 5:
             stable_run += 1
         else:
             stable_run = 0
 
-        c = 0.0
-        p = Pt(0,0)
-        xlist = []
-        ylist = []
-        for x in range(box_range[0].x, box_range[1].x, 10):
-            for y in range(box_range[0].y, box_range[1].y, 10):
-                if limg[y,x] > 0:
-                    c += limg[y,x]
-                    xlist.append((x, limg[y,x]))
-                    ylist.append((y, limg[y,x]))
-                    p += Pt(x*limg[y,x],y*limg[y,x])
-        if c != 0:
-            p = Pt(int(p.x/c), int(p.y/c))
-            avg_pos = p
+        med = get_median_position(difference_mask, selection_boundingbox)
+        if med != None:
+            mouse_liveview = med
 
-        if xlist:
-            m_live = Pt(median_pos(xlist), median_pos(ylist))
-
-        print(stable_run)
         if stable_run >= 5 and current_dvalue < 150:
-            print(current_dvalue, 'jkgfd')
             stable_run = 0
-            live_snap = None
-            m_live = Pt(0,0)
+            background_frame = None
+            mouse_liveview = Pt(0,0)
 
         last_dvalue = current_dvalue
 
-
-
-    amendImage(limg, static_image, m_live, m_static, abs(current_dvalue-last_dvalue) < 5)
+    amendImage(difference_mask, static_image, mouse_liveview, mouse_staticview, abs(current_dvalue-last_dvalue) < 5)
 
     # Display the resulting frame
-    cv2.imshow('Live',limg)
+    cv2.imshow('Live',difference_mask)
     cv2.imshow('Static',static_image)
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
     elif key == ord('j'):
-        live_snap = None
+        background_frame = None
 
 # When everything done, release the capture
 cap.release()
