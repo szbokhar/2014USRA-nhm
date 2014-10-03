@@ -14,6 +14,8 @@ BLUE = (255, 0, 0)
 tray_corner_points = []
 mouse_liveview = Pt(0,0)
 mouse_staticview = Pt(0,0)
+mouse_liveclick = 0
+mouse_staticclick = 0
 background_frame = None
 selection_boundingbox = None
 
@@ -36,10 +38,13 @@ def mouse_live(ev, x, y, flags, params):
 # Callback form mouse events on the scanned view
 def mouse_static(ev, x, y, flags, params):
     global mouse_staticview
+    global mouse_staticclick
     mouse_staticview = Pt(x,y)
+    if ev == 4:
+        mouse_staticclick = 1
 
 # Markup display image before displaying
-def amendImage(live_image, static_image, lp, sp, pickbox):
+def amendImage(live_image, static_image, lp, sp, pickbox, diff_center, static_target):
     global tray_corner_points
     global mapvals
     global background_frame
@@ -52,17 +57,23 @@ def amendImage(live_image, static_image, lp, sp, pickbox):
         cv2.line(live_image, (lp.x, lp.y-10), (lp.x, lp.y+10), GREEN)
 
     elif len(tray_corner_points) == 4:
-        (l_height, l_width) = live_image.shape
-        (s_height, s_width, _) = static_image.shape
-        (u,v) = compute_mapvals(tray_corner_points, s_width, s_height, lp)
-
-        # cv2.line(static_image, (u-10, v), (u+10, v), (0,255,0))
-        # cv2.line(static_image, (u, v-10), (u, v+10), (0,255,0))
-
         cv2.line(live_image, (lp.x-10, lp.y), (lp.x+10, lp.y), GREEN)
         cv2.line(live_image, (lp.x, lp.y-10), (lp.x, lp.y+10), GREEN)
         cv2.line(live_image, (lp.x-10, lp.y-10), (lp.x+10, lp.y+10), WHITE)
         cv2.line(live_image, (lp.x+10, lp.y-10), (lp.x-10, lp.y+10), WHITE)
+
+        (l_height, l_width) = live_image.shape
+        (s_height, s_width, _) = static_image.shape
+        if static_target != None:
+            (u, v) = static_target
+        elif diff_center != None:
+            (u,v) = compute_mapvals(tray_corner_points, s_width, s_height,
+                diff_center)
+        else:
+            (u,v) = (0,0)
+
+        cv2.line(static_image, (u-10, v), (u+10, v), (0,255,0))
+        cv2.line(static_image, (u, v-10), (u, v+10), (0,255,0))
 
         if pickbox:
             for b in csv_boxes:
@@ -153,7 +164,8 @@ def get_median_position(difference_mask, selection_bounding_box):
     xlist = []
     ylist = []
     for x in range(selection_boundingbox[0].x, selection_boundingbox[1].x, 10):
-        for y in range(selection_boundingbox[0].y, selection_boundingbox[1].y, 10):
+        for y in range(selection_boundingbox[0].y, selection_boundingbox[1].y,
+                10):
             if difference_mask[y,x] > 0:
                 c += difference_mask[y,x]
                 xlist.append((x, difference_mask[y,x]))
@@ -188,6 +200,7 @@ for i in range(len(csv_boxes)):
 last_dvalue = 0
 current_dvalue = 0
 stable_run = 0
+static_target = None
 
 while(True):
     # Capture frame-by-frame
@@ -197,6 +210,7 @@ while(True):
     static_image = np.copy(static_image_base)
     small_blur = cv2.GaussianBlur(small, (13,13), 0)
     difference_mask = small
+    diff_center = None
 
     if background_frame == None:
         if len(tray_corner_points) == 4:
@@ -210,36 +224,62 @@ while(True):
             selection_boundingbox = [Pt(minx,miny), Pt(maxx, maxy)]
 
     if background_frame != None:
-        difference_mask = np.absolute(np.subtract(background_frame.astype(int), small_blur.astype(int))).astype(np.uint8)
+        difference_mask = np.absolute(np.subtract(background_frame.astype(int),
+                small_blur.astype(int))).astype(np.uint8)
         (h,w,d) = difference_mask.shape
         polygon_mask = np.zeros((h,w,d), np.uint8)
-        poly = np.array([[p.x, p.y] for p in tray_corner_points], dtype=np.int32)
+        poly = np.array([[p.x, p.y] for p in tray_corner_points],
+                dtype=np.int32)
         cv2.drawContours(polygon_mask, [poly], 0, (1,1,1), -1)
-        difference_mask = np.add.reduce(np.square(np.multiply(np.float32(difference_mask), polygon_mask)), 2)
+        difference_mask = np.add.reduce(np.square(np.multiply(
+                np.float32(difference_mask), polygon_mask)), 2)
         difference_mask = np.sqrt(difference_mask)
         difference_mask[difference_mask < 12] = 0
         difference_mask = difference_mask/50
 
         alp = 0.4
-        current_dvalue = (1-alp)*last_dvalue + alp*math.sqrt(np.sum(difference_mask))
+        current_dvalue = (1-alp)*last_dvalue + alp*math.sqrt(
+                np.sum(difference_mask))
 
+        print('A')
         if abs(current_dvalue-last_dvalue) < 5:
+            print('B')
             stable_run += 1
         else:
+            print('C')
+            if static_target == None:
+                print('D')
+                stable_run = 0
+            else:
+                print('E')
+                stable_run = -10
+                static_target = (-1,-1)
+
+        if stable_run == -1:
+            print('E')
+            background_frame = None
             stable_run = 0
+            static_target = None
 
-        med = get_median_position(difference_mask, selection_boundingbox)
-        if med != None:
-            mouse_liveview = med
+        diff_center = get_median_position(difference_mask,
+                selection_boundingbox)
 
+        if mouse_staticclick ==  1:
+            background_frame = None
+            mouse_staticclick = 0
+            static_target = (mouse_staticview.x,mouse_staticview.y)
+            current_dvalue = 0
+        """
         if stable_run >= 5 and current_dvalue < 150:
             stable_run = 0
             background_frame = None
-            mouse_liveview = Pt(0,0)
+            """
+        print(stable_run, static_target != None)
 
         last_dvalue = current_dvalue
 
-    amendImage(difference_mask, static_image, mouse_liveview, mouse_staticview, abs(current_dvalue-last_dvalue) < 5)
+    amendImage(difference_mask, static_image, mouse_liveview, mouse_staticview,
+            abs(current_dvalue-last_dvalue) < 5, diff_center, static_target)
 
     # Display the resulting frame
     cv2.imshow('Live',difference_mask)
