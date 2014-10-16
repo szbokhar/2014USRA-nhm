@@ -3,6 +3,8 @@ from Pt import *
 import cv2
 import sys
 import numpy as np
+import os.path
+import csv
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -57,6 +59,12 @@ class AppData:
         self.phase = AppData.LOAD_FILE
         self.polyboxProgress = 0
         self.polyPoints = []
+        self.selection_boundingbox = None
+        self.activeFrameLastDiff = None
+        self.activeFrameSmoothDelta = None
+        self.stableRun = 0
+        self.stableAverage = 0
+        self.lastStableAverage = 0
 
     def setGuiElements(self, control, big, small):
         self.controlPanel = control
@@ -71,10 +79,28 @@ class AppData:
     def setTrayScan(self, fname):
         self.trayPath = fname
         self.trayImage = cv2.imread(self.trayPath, cv2.IMREAD_COLOR)
+        oH = self.trayImage.shape[0]
         self.trayImage = cv2.pyrDown(self.trayImage)
+        self.trayImageScale = float(self.trayImage.shape[0])/oH
         self.staticLabel.setImage(self.trayImage)
+
+        csvFname = list(os.path.splitext(fname))
+        csvFname[-1] = '.csv'
+        csvFname = ''.join(csvFname)
+        self.CSVPath = csvFname
+        self.loadCSVFile(self.CSVPath)
+
         self.startCameraFeed()
         self.phase = AppData.SELECT_POLYGON
+
+    def loadCSVFile(self, fname):
+        self.bugBoxes = []
+        with open(fname, 'rb') as csvfile:
+            boxes = csv.reader(csvfile, delimiter=',')
+            for b in boxes:
+                if len(b) >= 5:
+                    self.bugBoxes.append([int(i) for i in b[1],b[2],b[3],b[4]])
+
 
     def startCameraFeed(self):
         if not self.camOn:
@@ -89,7 +115,7 @@ class AppData:
         _, cameraImage = self.capture.read()
         self.cameraImage = cv2.pyrDown(cameraImage)
         self.cameraImage = cv2.pyrDown(self.cameraImage)
-        self.cameraImage = cv2.pyrDown(self.cameraImage)
+        #self.cameraImage = cv2.pyrDown(self.cameraImage)
         staticImage = np.copy(self.trayImage)
         (cameraFrame, staticFrame) = self.amendFrame(self.cameraImage, staticImage)
 
@@ -100,14 +126,18 @@ class AppData:
         self.bigMPos = (x,y)
 
     def amendFrame(self, cameraFrame, staticFrame):
+        cameraFrame = np.copy(cameraFrame)
+        staticFrame = np.copy(staticFrame)
+
         (mx, my) = self.bigMPos
-        cv2.line(cameraFrame, (mx-10, my), (mx+10, my), (255,0,0), 1)
-        cv2.line(cameraFrame, (mx, my-10), (mx, my+10), (255,0,0), 1)
 
         if self.phase == AppData.SELECT_POLYGON:
+            cv2.line(cameraFrame, (mx-10, my), (mx+10, my), (255,0,0), 1)
+            cv2.line(cameraFrame, (mx, my-10), (mx, my+10), (255,0,0), 1)
             for p in self.polyPoints:
                 cv2.circle(cameraFrame, (p.x, p.y), 5, (0,255,0))
         elif self.phase == AppData.ACTIVE_MODE:
+            """
             for i in range(4):
                 p1 = self.polyPoints[i]
                 p2 = self.polyPoints[(i+1)%4]
@@ -119,8 +149,32 @@ class AppData:
 
             cv2.line(staticFrame, (u-20, v), (u+20, v), (0,0,255), 5)
             cv2.line(staticFrame, (u, v-20), (u, v+20), (0,0,255), 5)
+            """
 
-            cameraFrame = np.uint8(np.add.reduce(np.absolute(np.subtract(np.float32(cameraFrame), np.float32(self.camBackground))), 2))
+            (cf, cPt) = self.getCameraPoint(cameraFrame)
+            if cPt != None:
+                cv2.line(cf, (cPt.x-10, cPt.y), (cPt.x+10, cPt.y), (255,255,255), 1)
+                cv2.line(cf, (cPt.x, cPt.y-10), (cPt.x, cPt.y+10), (255,255,255), 1)
+                cv2.line(cf, (cPt.x-10, cPt.y-10), (cPt.x+10, cPt.y+10), (0,0,0), 1)
+                cv2.line(cf, (cPt.x+10, cPt.y-10), (cPt.x-10, cPt.y+10), (0,0,0), 1)
+                (trayHeight, trayWidth, _) = self.trayImage.shape
+                (u,v) = compute_mapvals(self.polyPoints, trayWidth, trayHeight, cPt)
+                cv2.line(staticFrame, (u-10, v), (u+10, v), (0,0,255), 5)
+                cv2.line(staticFrame, (u, v-10), (u, v+10), (0,0,255), 5)
+
+                r = self.trayImageScale
+                for b in self.bugBoxes:
+                    if (u > b[0]*r and u < b[2]*r and v > b[1]*r and v < b[3]*r):
+                        q0 = (int(b[0]*r), int(b[1]*r))
+                        q1 = (int(b[2]*r), int(b[1]*r))
+                        q2 = (int(b[2]*r), int(b[3]*r))
+                        q3 = (int(b[0]*r), int(b[3]*r))
+                        cv2.line(staticFrame, q0, q1, (0,0,255), 2)
+                        cv2.line(staticFrame, q1, q2, (0,0,255), 2)
+                        cv2.line(staticFrame, q2, q3, (0,0,255), 2)
+                        cv2.line(staticFrame, q3, q0, (0,0,255), 2)
+                        break
+            return (cf, staticFrame)
 
         return (cameraFrame, staticFrame)
 
@@ -133,8 +187,70 @@ class AppData:
         self.cameraLabel = self.staticLabel
         self.staticLabel = tmp
 
-    def getCameraPoint(self):
-        return Pt(10, 10)
+        (minx, miny, maxx, maxy) = (1000, 1000, 0, 0)
+        for p in self.polyPoints:
+            minx = p.x if p.x < minx else minx
+            miny = p.y if p.y < miny else miny
+            maxx = p.x if p.x > maxx else maxx
+            maxy = p.y if p.y > maxy else maxy
+        self.selection_boundingbox = [Pt(minx,miny), Pt(maxx, maxy)]
+
+        self.controlPanel.btnRefreshCamera.setEnabled(True)
+
+    def getCameraPoint(self, cameraFrame):
+        frame = np.absolute(np.subtract(self.camBackground.astype(int),
+                cameraFrame.astype(int))).astype(np.uint8)
+        (h,w,d) = frame.shape
+        polygon_mask = np.zeros((h,w,d), np.uint8)
+        poly = np.array([[p.x, p.y] for p in self.polyPoints],
+                dtype=np.int32)
+        cv2.drawContours(polygon_mask, [poly], 0, (1,1,1), -1)
+        frame = np.add.reduce(np.square(np.multiply(
+                np.float32(frame), polygon_mask)), 2)
+        frame = np.sqrt(frame)
+        frame = cv2.GaussianBlur(frame, (5,5), 0)
+        frame[frame < 12] = 0
+        tframe = np.copy(frame)
+
+        medpos = None
+        if self.activeFrameLastDiff != None:
+            a = 1.0
+            activeFrameCurrentDiff = np.sum(tframe)
+            delta = activeFrameCurrentDiff - self.activeFrameLastDiff
+            self.activeFrameSmoothDelta = (1-a)*self.activeFrameSmoothDelta + a*delta
+            self.activeFrameLastDiff = activeFrameCurrentDiff
+            if abs(self.activeFrameSmoothDelta) < 25000:
+                self.stableRun += 1
+            else:
+                if self.stableRun > 15:
+                    self.lastStableAverage = self.stableAverage
+                    self.stableAverage = 0
+                self.stableRun = 0
+
+            if self.stableRun == 15:
+                self.stableAverage = activeFrameCurrentDiff
+            elif self.stableRun > 15:
+                b = 0.5
+                self.stableAverage = (1-b)*self.stableAverage + b*activeFrameCurrentDiff
+
+                medpos = get_median_position(tframe, self.selection_boundingbox)
+                if self.lastStableAverage > self.stableAverage:
+                    medpos = None
+                    if self.lastStableAverage * 1.1 > self.stableAverage:
+                        self.refreshCamera()
+
+        else:
+            self.activeFrameLastDiff = np.sum(tframe)
+            self.activeFrameSmoothDelta = 0
+
+        frame = np.uint8(frame)
+        return (frame, medpos)
+
+    def refreshCamera(self):
+        self.camBackground = np.copy(self.cameraImage)
+        self.stableRun = 0
+        self.stableAverage = 0
+        self.lastStableAverage = 0
 
 class ControlPanel(QtGui.QFrame):
 
@@ -154,16 +270,23 @@ class ControlPanel(QtGui.QFrame):
         self.btnLoadTray.setMinimumHeight(50)
         self.btnLoadTray.setStatusTip("Load Tray Scan")
 
+        self.btnRefreshCamera = QtGui.QPushButton("Refresh camera")
+        self.btnRefreshCamera.setMinimumHeight(50)
+        self.btnRefreshCamera.setStatusTip("Refresh Camera")
+        self.btnRefreshCamera.setEnabled(False)
+
         self.btnQuit = QtGui.QPushButton("Quit")
         self.btnQuit.setMinimumHeight(50)
         self.btnQuit.setStatusTip("Quit")
 
         panelLayout.addWidget(self.btnLoadTray)
+        panelLayout.addWidget(self.btnRefreshCamera)
         panelLayout.addWidget(self.btnQuit)
         panelLayout.addStretch(1)
 
         self.btnLoadTray.clicked.connect(self.selectTrayImage)
         self.btnQuit.clicked.connect(QtCore.QCoreApplication.instance().quit)
+        self.btnRefreshCamera.clicked.connect(self.data.refreshCamera)
 
     def selectTrayImage(self):
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
@@ -273,6 +396,48 @@ def compute_mapvals(points, scalex, scaley, pos):
 
     return (int(u*scalex), int(v*scaley))
 
+def get_median_position(difference_mask, selection_boundingbox):
+    c = 0.0
+    p = Pt(0,0)
+    xlist = []
+    ylist = []
+    for x in range(selection_boundingbox[0].x, selection_boundingbox[1].x, 5):
+        for y in range(selection_boundingbox[0].y, selection_boundingbox[1].y,
+                5):
+            if difference_mask[y,x] > 0:
+                c += difference_mask[y,x]
+                xlist.append((x, difference_mask[y,x]))
+                ylist.append((y, difference_mask[y,x]))
+                p += Pt(x*difference_mask[y,x],y*difference_mask[y,x])
+
+    if xlist:
+        return Pt(median_pos(xlist), median_pos(ylist))
+
+    return None
+
+def median_pos(lst):
+    lst.sort()
+    for i in range(1,len(lst)):
+        (cord, weight) = lst[i]
+        (_, pweight) = lst[i-1]
+        lst[i] = (cord, weight+pweight)
+
+    if lst:
+        xmed = lst[-1][1]/2
+        low = 0
+        high = len(lst)-1
+        while (high-low > 1):
+            check = int(math.floor((high+low)/2))
+            (v, w) = lst[check]
+            if w > xmed:
+                high = check
+            elif w < xmed:
+                low = check
+            else:
+                low = check
+                high = check
+                break
+        return lst[high][0]
 
 def main():
     logfile = None
