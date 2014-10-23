@@ -48,6 +48,7 @@ class MainWindow(QtGui.QMainWindow):
 class AppData:
 
     LOAD_FILE, SELECT_POLYGON, ACTIVE_MODE = range(3)
+    ACTION_DELAY = 25
 
     def __init__(self):
         self.camOn = False
@@ -59,12 +60,14 @@ class AppData:
         self.phase = AppData.LOAD_FILE
         self.polyboxProgress = 0
         self.polyPoints = []
+        self.polygonModel = None
         self.selection_boundingbox = None
         self.activeFrameLastDiff = None
         self.activeFrameSmoothDelta = None
         self.stableRun = 0
         self.stableAverage = 0
         self.lastStableAverage = 0
+        self.removedBug = -1
 
     def setGuiElements(self, control, big, small):
         self.controlPanel = control
@@ -157,26 +160,56 @@ class AppData:
                 cv2.line(cf, (cPt.x, cPt.y-10), (cPt.x, cPt.y+10), (255,255,255), 1)
                 cv2.line(cf, (cPt.x-10, cPt.y-10), (cPt.x+10, cPt.y+10), (0,0,0), 1)
                 cv2.line(cf, (cPt.x+10, cPt.y-10), (cPt.x-10, cPt.y+10), (0,0,0), 1)
-                (trayHeight, trayWidth, _) = self.trayImage.shape
-                (u,v) = compute_mapvals(self.polyPoints, trayWidth, trayHeight, cPt)
-                cv2.line(staticFrame, (u-10, v), (u+10, v), (0,0,255), 5)
-                cv2.line(staticFrame, (u, v-10), (u, v+10), (0,0,255), 5)
 
-                r = self.trayImageScale
-                for b in self.bugBoxes:
-                    if (u > b[0]*r and u < b[2]*r and v > b[1]*r and v < b[3]*r):
-                        q0 = (int(b[0]*r), int(b[1]*r))
-                        q1 = (int(b[2]*r), int(b[1]*r))
-                        q2 = (int(b[2]*r), int(b[3]*r))
-                        q3 = (int(b[0]*r), int(b[3]*r))
-                        cv2.line(staticFrame, q0, q1, (0,0,255), 2)
-                        cv2.line(staticFrame, q1, q2, (0,0,255), 2)
-                        cv2.line(staticFrame, q2, q3, (0,0,255), 2)
-                        cv2.line(staticFrame, q3, q0, (0,0,255), 2)
-                        break
+            self.findCorrectBox(cPt, cf, staticFrame)
             return (cf, staticFrame)
 
         return (cameraFrame, staticFrame)
+
+    def findCorrectBox(self, live_pt, live_frame, static_frame):
+        if live_pt != None:
+            (trayHeight, trayWidth, _) = self.trayImage.shape
+            (u,v) = poly2square(self.polygon_model, trayWidth, trayHeight, live_pt)
+            cv2.line(static_frame, (u-10, v), (u+10, v), (0,0,255), 5)
+            cv2.line(static_frame, (u, v-10), (u, v+10), (0,0,255), 5)
+            r = self.trayImageScale
+            box = -1
+            for b in self.bugBoxes:
+                box += 1
+                if (u > b[0]*r and u < b[2]*r and v > b[1]*r and v < b[3]*r):
+                    self.drawLiveAndStaticBoxes(live_frame, static_frame, b)
+                    break
+
+            if self.stableRun == 2*AppData.ACTION_DELAY and self.removedBug == -1:
+                self.removedBug = box
+                self.refreshCamera()
+            elif self.stableRun >= AppData.ACTION_DELAY and self.removedBug != -1 and self.activeFrameLastDiff > 50:
+                self.removedBug = -1
+                self.refreshCamera()
+
+        if self.removedBug >= 0:
+            self.drawLiveAndStaticBoxes(live_frame, static_frame, self.bugBoxes[self.removedBug])
+
+    def drawLiveAndStaticBoxes(self, live_frame, static_frame, box_coords):
+        b = box_coords
+        (trayHeight, trayWidth, _) = self.trayImage.shape
+        r = self.trayImageScale
+        q0 = Pt(int(b[0]*r), int(b[1]*r))
+        q1 = Pt(int(b[2]*r), int(b[1]*r))
+        q2 = Pt(int(b[2]*r), int(b[3]*r))
+        q3 = Pt(int(b[0]*r), int(b[3]*r))
+        cv2.line(static_frame, q0.t(), q1.t(), (0,0,255), 2)
+        cv2.line(static_frame, q1.t(), q2.t(), (0,0,255), 2)
+        cv2.line(static_frame, q2.t(), q3.t(), (0,0,255), 2)
+        cv2.line(static_frame, q3.t(), q0.t(), (0,0,255), 2)
+        p0 = square2poly(self.polygon_model, trayWidth, trayHeight, q0)
+        p1 = square2poly(self.polygon_model, trayWidth, trayHeight, q1)
+        p2 = square2poly(self.polygon_model, trayWidth, trayHeight, q2)
+        p3 = square2poly(self.polygon_model, trayWidth, trayHeight, q3)
+        cv2.line(live_frame, p0, p1, (255,255,255), 2)
+        cv2.line(live_frame, p1, p2, (255,255,255), 2)
+        cv2.line(live_frame, p2, p3, (255,255,255), 2)
+        cv2.line(live_frame, p3, p0, (255,255,255), 2)
 
     def gotBox(self):
         self.camBackground = np.copy(self.cameraImage)
@@ -194,6 +227,7 @@ class AppData:
             maxx = p.x if p.x > maxx else maxx
             maxy = p.y if p.y > maxy else maxy
         self.selection_boundingbox = [Pt(minx,miny), Pt(maxx, maxy)]
+        self.polygon_model = compute_polygon_model(self.polyPoints)
 
         self.controlPanel.btnRefreshCamera.setEnabled(True)
 
@@ -202,8 +236,28 @@ class AppData:
                 cameraFrame.astype(int))).astype(np.uint8)
         (h,w,d) = frame.shape
         polygon_mask = np.zeros((h,w,d), np.uint8)
-        poly = np.array([[p.x, p.y] for p in self.polyPoints],
-                dtype=np.int32)
+
+        poly = None
+        polyArea = -1
+        if self.removedBug == -1:
+            poly = np.array([[p.x, p.y] for p in self.polyPoints],
+                    dtype=np.int32)
+            polyArea = area_of_quadrilateral([(p.x,p.y) for p in self.polyPoints])
+        else:
+            b = self.bugBoxes[self.removedBug]
+            (trayHeight, trayWidth, _) = self.trayImage.shape
+            r = self.trayImageScale
+            q0 = Pt(int(b[0]*r), int(b[1]*r))
+            q1 = Pt(int(b[2]*r), int(b[1]*r))
+            q2 = Pt(int(b[2]*r), int(b[3]*r))
+            q3 = Pt(int(b[0]*r), int(b[3]*r))
+            p0 = square2poly(self.polygon_model, trayWidth, trayHeight, q0)
+            p1 = square2poly(self.polygon_model, trayWidth, trayHeight, q1)
+            p2 = square2poly(self.polygon_model, trayWidth, trayHeight, q2)
+            p3 = square2poly(self.polygon_model, trayWidth, trayHeight, q3)
+            poly = np.array([p0, p1, p2, p3], dtype=np.int32)
+            polyArea = area_of_quadrilateral([p0, p1, p2, p3])
+
         cv2.drawContours(polygon_mask, [poly], 0, (1,1,1), -1)
         frame = np.add.reduce(np.square(np.multiply(
                 np.float32(frame), polygon_mask)), 2)
@@ -215,42 +269,31 @@ class AppData:
         medpos = None
         if self.activeFrameLastDiff != None:
             a = 1.0
-            activeFrameCurrentDiff = np.sum(tframe)
+            activeFrameCurrentDiff = np.sum(tframe)/polyArea
             delta = activeFrameCurrentDiff - self.activeFrameLastDiff
             self.activeFrameSmoothDelta = (1-a)*self.activeFrameSmoothDelta + a*delta
             self.activeFrameLastDiff = activeFrameCurrentDiff
-            if abs(self.activeFrameSmoothDelta) < 25000:
+            print(self.stableRun, activeFrameCurrentDiff, self.activeFrameSmoothDelta)
+
+            if abs(self.activeFrameSmoothDelta) < 1:
                 self.stableRun += 1
             else:
-                if self.stableRun > 15:
-                    self.lastStableAverage = self.stableAverage
-                    self.stableAverage = 0
                 self.stableRun = 0
 
-            if self.stableRun == 15:
-                self.stableAverage = activeFrameCurrentDiff
-            elif self.stableRun > 15:
-                b = 0.5
-                self.stableAverage = (1-b)*self.stableAverage + b*activeFrameCurrentDiff
-
+            if self.stableRun > AppData.ACTION_DELAY:
                 medpos = get_median_position(tframe, self.selection_boundingbox)
-                if self.lastStableAverage > self.stableAverage:
-                    medpos = None
-                    if self.lastStableAverage * 1.1 > self.stableAverage:
-                        self.refreshCamera()
 
         else:
-            self.activeFrameLastDiff = np.sum(tframe)
+            self.activeFrameLastDiff = np.sum(tframe)/polyArea
             self.activeFrameSmoothDelta = 0
 
         frame = np.uint8(frame)
+        # medpos = get_median_position(tframe, self.selection_boundingbox)
         return (frame, medpos)
 
     def refreshCamera(self):
         self.camBackground = np.copy(self.cameraImage)
         self.stableRun = 0
-        self.stableAverage = 0
-        self.lastStableAverage = 0
 
 class ControlPanel(QtGui.QFrame):
 
@@ -373,10 +416,9 @@ def keepAspectRatio(original, box):
     rat = min(float(bW)/w, float(bH)/h)
     return (int(w*rat), int(h*rat), rat)
 
-def compute_mapvals(points, scalex, scaley, pos):
+def compute_polygon_model(points):
     [p0, p1, p2, p3] = points
     [p00, p01, p02, p03] = [p0-p0, p1-p0, p2-p0, p3-p0]
-    (x,y) = (pos.x-p0.x, pos.y-p0.y)
 
     C = 0
     F = 0
@@ -391,10 +433,34 @@ def compute_mapvals(points, scalex, scaley, pos):
     E = HH*(p3-p0).y
     G = GG-1
     H = HH-1
+
+    return (p0,A,B,C,D,E,F,G,H)
+
+def poly2square(model, scalex, scaley, pos):
+    (p0,A,B,C,D,E,F,G,H) = model
+    (x,y) = (pos.x-p0.x, pos.y-p0.y)
+
     v = (-A*F+A*y+C*D-C*G*y-D*x+F*G*x)/(A*E-A*H*y-B*D+B*G*y+D*H*x-E*G*x)
     u = (-C-B*v+x+H*v*x)/(A-G*x)
 
     return (int(u*scalex), int(v*scaley))
+
+def square2poly(model, scalex, scaley, pos):
+    (p0,A,B,C,D,E,F,G,H) = model
+    (u,v) = (pos.x/float(scalex), pos.y/float(scaley))
+
+    x = (A*u+B*v+C)/(G*u+H*v+1) + p0.x
+    y = (D*u+E*v+F)/(G*u+H*v+1) + p0.y
+
+    return (int(x),int(y))
+
+def area_of_quadrilateral(points):
+    [p0, p1, p2, p3] = points
+    return area_of_triangle([p0, p1, p2]) + area_of_triangle([p2, p3, p0])
+
+def area_of_triangle(points):
+    [(x0, y0), (x1, y1), (x2, y2)] = points
+    return 0.5*(x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1))
 
 def get_median_position(difference_mask, selection_boundingbox):
     c = 0.0

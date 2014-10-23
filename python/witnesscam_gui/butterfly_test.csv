@@ -1,7 +1,8 @@
 "Source Image", /Users/szbokhar/Coding/naturalhistorymuseum/python/witnesscam_gui/butterfly_test.png
 "Box 0", 0, 0, 0, 0
-"Box 1", 785, 57, 1539, 485
-"Box 2", 1544, 121, 2216, 512
-"Box 3", 852, 551, 1500, 904
-"Box 4", 72, 459, 826, 887
-"Box 5", 131, 865, 831, 1240
+"Box 1", 1521, 119, 2205, 511
+"Box 2", 821, 99, 1505, 491
+"Box 3", 100, 81, 836, 501
+"Box 4", 126, 501, 810, 893
+"Box 5", 833, 518, 1517, 910
+"Box 6", 160, 849, 844, 1241

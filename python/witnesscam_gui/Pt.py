@@ -12,6 +12,9 @@ class Pt:
     def length2(self):
         return self.x**2 + self.y**2
 
+    def t(self):
+        return (self.x, self.y)
+
     def __str__(self):
         pp('str')
         return 'Pt(' + str(self.x) + ", " + str(self.x) + ")"
