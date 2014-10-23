@@ -131,6 +131,9 @@ class SegmentationData:
         for (i, (x1,y1,x2,y2)) in self._boxes:
             f.write("\"Box %d\", %d, %d, %d, %d\n" % (i,x1,y1,x2,y2))
 
+        (x1,y1,x2,y2) = self._templateBox
+        f.write("\"Temp\", %d, %d, %d, %d\n" % (x1,y1,x2,y2))
+
         logging.info("Saving CSV %s" % fname)
 
     def boxes(self):
