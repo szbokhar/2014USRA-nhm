@@ -1,5 +1,4 @@
 from PySide import QtCore, QtGui
-import csv
 import cv2
 import numpy as np
 import os.path
@@ -11,7 +10,7 @@ from Pt import *
 class AppData:
 
     LOAD_FILE, SELECT_POLYGON, ACTIVE_MODE = range(3)
-    ACTION_DELAY = 25
+    ACTION_DELAY = 15
 
     def __init__(self):
         self.camOn = False
@@ -25,6 +24,7 @@ class AppData:
         self.polyPoints = []
         self.polygonModel = None
         self.selection_boundingbox = None
+        self.activeFrameCurrentDiff = None
         self.activeFrameLastDiff = None
         self.activeFrameSmoothDelta = None
         self.stableRun = 0
@@ -32,7 +32,10 @@ class AppData:
         self.lastStableAverage = 0
         self.removedBug = -1
         self.frameCount = 0
-        self.boxLabels = []
+        self.currentSelectionBox = None
+        self.placedBoxes = []
+        self.stableBoxRun = 0
+        self.stableBox = None
 
     def setGuiElements(self, control, big, small):
         self.controlPanel = control
@@ -52,26 +55,8 @@ class AppData:
         self.trayImageScale = float(self.trayImage.shape[0])/oH
         self.staticLabel.setImage(self.trayImage)
 
-        csvFname = list(os.path.splitext(fname))
-        csvFname[-1] = '.csv'
-        csvFname = ''.join(csvFname)
-        self.CSVPath = csvFname
-        self.loadCSVFile(self.CSVPath)
-
         self.startCameraFeed()
         self.phase = AppData.SELECT_POLYGON
-
-    def loadCSVFile(self, fname):
-        self.bugBoxes = []
-        with open(fname, 'rb') as csvfile:
-            boxes = csv.reader(csvfile, delimiter=',')
-            j = 1
-            for b in boxes:
-                if len(b) >= 5:
-                    self.bugBoxes.append([int(i) for i in b[1],b[2],b[3],b[4]])
-                    self.boxLabels.append('Bug #' + str(j))
-                    j += 1
-
 
     def startCameraFeed(self):
         if not self.camOn:
@@ -111,12 +96,24 @@ class AppData:
 
             (cf, cPt) = self.getCameraPoint(cameraFrame)
             if cPt != None:
+                if self.removedBug != -1 and self.activeFrameCurrentDiff > 30 and self.stableRun >= 2*AppData.ACTION_DELAY:
+                    self.removedBug = -1
+                    self.currentSelectionBox = None
+                    self.refreshCamera()
+                """
                 cv2.line(cf, (cPt.x-10, cPt.y), (cPt.x+10, cPt.y), (255,255,255), 1)
                 cv2.line(cf, (cPt.x, cPt.y-10), (cPt.x, cPt.y+10), (255,255,255), 1)
                 cv2.line(cf, (cPt.x-10, cPt.y-10), (cPt.x+10, cPt.y+10), (0,0,0), 1)
                 cv2.line(cf, (cPt.x+10, cPt.y-10), (cPt.x-10, cPt.y+10), (0,0,0), 1)
+                """
 
-            self.findCorrectBox(cPt, cf, staticFrame)
+            for ((b, _), _) in self.placedBoxes:
+                cv2.rectangle(staticFrame, b[0:2], b[2:4], (0, 255, 0), 2)
+
+            if self.currentSelectionBox == None and self.stableRun >= AppData.ACTION_DELAY:
+                (cf, staticFrame) = self.findCorrectBox(cPt, cf, staticFrame)
+            elif self.currentSelectionBox != None:
+                cv2.rectangle(staticFrame, self.currentSelectionBox[0][0:2], self.currentSelectionBox[0][2:4], (0, 0, 255), 2)
 
             """
             if self.removedBug != -1:
@@ -137,6 +134,7 @@ class AppData:
                         self.boxLabels[self.removedBug] = dm_read.message(1)
                         self.controlPanel.setLabelText(dm_read.message(1))
                         """
+            cf[cf > 0] = 255
 
             return (cf, staticFrame)
 
@@ -149,6 +147,42 @@ class AppData:
             cv2.line(static_frame, (u-10, v), (u+10, v), (0,0,255), 5)
             cv2.line(static_frame, (u, v-10), (u, v+10), (0,0,255), 5)
             r = self.trayImageScale
+
+            (life_frame, static_box, live_box) = self.floodFillBox(live_pt, live_frame)
+            if static_box != None:
+
+                if self.stableBox == None:
+                    self.stableBox = (static_box, live_box)
+                else:
+                    ((x1,y1,x2,y2), _) = self.stableBox
+                    (x3,y3,x4,y4) = static_box
+                    w = x2-x1
+                    h = y2-y1
+                    eps = 0.05
+                    if (abs(x3-x1) < w*eps and abs(y3-y1) < h*eps and abs(x4-x2) < w*eps and abs(y4-y2) < h*eps):
+                        a = 1.0
+                        self.stableBoxRun += 1
+                        self.stableBox = ((int(a*x3+(1-a)*x1), int(a*y3+(1-a)*y1), int(a*x4+(1-a)*x2), int(a*y4+(1-a)*y2)), live_box)
+                    else:
+                        self.stableBoxRun = 0
+                        self.stableBox = (static_box, live_box)
+
+                if self.stableBoxRun >= AppData.ACTION_DELAY:
+
+                    (i, overlapped) = getOverlappingBox(self.placedBoxes, self.stableBox)
+                    if overlapped == None:
+                        self.currentSelectionBox = self.stableBox
+                        self.placedBoxes.append((self.stableBox, "Box " + str(len(self.placedBoxes))))
+                        self.removedBug = len(self.placedBoxes)-1
+                        self.refreshCamera()
+                    else:
+                        self.currentSelectionBox = overlapped
+                        self.removedBug = i
+                        self.refreshCamera()
+
+
+
+            """
             box = -1
             for b in self.bugBoxes:
                 box += 1
@@ -169,27 +203,36 @@ class AppData:
 
         if self.removedBug >= 0:
             self.drawLiveAndStaticBoxes(live_frame, static_frame, self.bugBoxes[self.removedBug])
+            """
+        return (live_frame, static_frame)
 
-    def drawLiveAndStaticBoxes(self, live_frame, static_frame, box_coords):
-        b = box_coords
-        (trayHeight, trayWidth, _) = self.trayImage.shape
-        r = self.trayImageScale
-        q0 = Pt(int(b[0]*r), int(b[1]*r))
-        q1 = Pt(int(b[2]*r), int(b[1]*r))
-        q2 = Pt(int(b[2]*r), int(b[3]*r))
-        q3 = Pt(int(b[0]*r), int(b[3]*r))
-        cv2.line(static_frame, q0.t(), q1.t(), (0,0,255), 2)
-        cv2.line(static_frame, q1.t(), q2.t(), (0,0,255), 2)
-        cv2.line(static_frame, q2.t(), q3.t(), (0,0,255), 2)
-        cv2.line(static_frame, q3.t(), q0.t(), (0,0,255), 2)
-        p0 = square2poly(self.polygon_model, trayWidth, trayHeight, q0)
-        p1 = square2poly(self.polygon_model, trayWidth, trayHeight, q1)
-        p2 = square2poly(self.polygon_model, trayWidth, trayHeight, q2)
-        p3 = square2poly(self.polygon_model, trayWidth, trayHeight, q3)
-        cv2.line(live_frame, p0, p1, (255,255,255), 2)
-        cv2.line(live_frame, p1, p2, (255,255,255), 2)
-        cv2.line(live_frame, p2, p3, (255,255,255), 2)
-        cv2.line(live_frame, p3, p0, (255,255,255), 2)
+    def floodFillBox(self, p, frameOrig):
+        frame = np.copy(frameOrig)
+        frame[frame > 12] = 1
+
+        conts, hir = cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        staticContour = []
+        for i in range(len(conts)):
+            if cv2.pointPolygonTest(conts[i], p.t(), True) >= 0:
+                cv2.drawContours(frame, conts, i, (255, 255, 255))
+                (trayHeight, trayWidth, _) = self.trayImage.shape
+                (sx1, sy1, sx2, sy2) = (trayWidth,trayHeight,0,0)
+                (lx1, ly1, lx2, ly2) = (trayWidth,trayHeight,0,0)
+                for q in conts[i]:
+                    (lx,ly) = q[0]
+                    (sx,sy) = poly2square(self.polygon_model, trayWidth, trayHeight, Pt(q[0,0],q[0,1]))
+                    sx1 = min(sx1,sx)
+                    sy1 = min(sy1,sy)
+                    sx2 = max(sx2,sx)
+                    sy2 = max(sy2,sy)
+                    lx1 = min(lx1,lx)
+                    ly1 = min(ly1,ly)
+                    lx2 = max(lx2,lx)
+                    ly2 = max(ly2,ly)
+                    staticContour.append((sx,sy))
+                return (frameOrig, (sx1, sy1, sx2, sy2), (lx1, ly1, lx2, ly2))
+
+        return (frameOrig, None, None)
 
     def gotBox(self):
         self.camBackground = np.copy(self.cameraImage)
@@ -224,19 +267,13 @@ class AppData:
                     dtype=np.int32)
             polyArea = area_of_quadrilateral([(p.x,p.y) for p in self.polyPoints])
         else:
-            b = self.bugBoxes[self.removedBug]
-            (trayHeight, trayWidth, _) = self.trayImage.shape
-            r = self.trayImageScale
-            q0 = Pt(int(b[0]*r), int(b[1]*r))
-            q1 = Pt(int(b[2]*r), int(b[1]*r))
-            q2 = Pt(int(b[2]*r), int(b[3]*r))
-            q3 = Pt(int(b[0]*r), int(b[3]*r))
-            p0 = square2poly(self.polygon_model, trayWidth, trayHeight, q0)
-            p1 = square2poly(self.polygon_model, trayWidth, trayHeight, q1)
-            p2 = square2poly(self.polygon_model, trayWidth, trayHeight, q2)
-            p3 = square2poly(self.polygon_model, trayWidth, trayHeight, q3)
-            poly = np.array([p0, p1, p2, p3], dtype=np.int32)
-            polyArea = area_of_quadrilateral([p0, p1, p2, p3])
+            b = self.currentSelectionBox[1]
+            q0 = (int(b[0]), int(b[1]))
+            q1 = (int(b[2]), int(b[1]))
+            q2 = (int(b[2]), int(b[3]))
+            q3 = (int(b[0]), int(b[3]))
+            poly = np.array([q0, q1, q2, q3], dtype=np.int32)
+            polyArea = area_of_quadrilateral([q0, q1, q2, q3])
 
         cv2.drawContours(polygon_mask, [poly], 0, (1,1,1), -1)
         frame = np.add.reduce(np.square(np.multiply(
@@ -250,12 +287,12 @@ class AppData:
         medpos = None
         if self.activeFrameLastDiff != None:
             a = 1.0
-            activeFrameCurrentDiff = np.sum(tframe)/polyArea
-            delta = activeFrameCurrentDiff - self.activeFrameLastDiff
+            self.activeFrameCurrentDiff = np.sum(tframe)/polyArea
+            delta = self.activeFrameCurrentDiff - self.activeFrameLastDiff
             self.activeFrameSmoothDelta = (1-a)*self.activeFrameSmoothDelta + a*delta
-            self.activeFrameLastDiff = activeFrameCurrentDiff
+            self.activeFrameLastDiff = self.activeFrameCurrentDiff
 
-            if abs(self.activeFrameSmoothDelta) < 1:
+            if abs(self.activeFrameSmoothDelta) < 0.3:
                 self.stableRun += 1
             else:
                 self.stableRun = 0
@@ -265,14 +302,12 @@ class AppData:
 
             if self.removedBug != -1:
                 self.frameCount += 1
-                print(self.frameCount)
 
         else:
             self.activeFrameLastDiff = np.sum(tframe)/polyArea
             self.activeFrameSmoothDelta = 0
 
         frame = np.uint8(frame)
-        # medpos = get_median_position(tframe, self.selection_boundingbox)
         return (frame, medpos)
 
     def refreshCamera(self):
@@ -282,4 +317,14 @@ class AppData:
     def refreshCameraButton(self):
         self.refreshCamera()
         self.removedBug = -1
+        self.currentSelectionBox = None
+
+    def exportToCSV(self):
+        fname, _ = QtGui.QFileDialog.getSaveFileName()
+        print(fname)
+
+        f = open(fname, 'w')
+        for ((b, _), code) in self.placedBoxes:
+            f.write(code + ", " + str(b) + '\n')
+
 

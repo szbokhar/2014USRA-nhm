@@ -95,3 +95,25 @@ def median_pos(lst):
                 break
         return lst[high][0]
 
+def getOverlappingBox(boxes, box):
+    (x1,y1,x2,y2), _ = box
+    i = 0
+    for ((b, _), _) in boxes:
+        (u1,v1,u2,v2) = b
+
+        if not (x1 > u2 or u1 > x2 or y1 > v2 or v1 > y2):
+            a = max(x1,u1)
+            b = max(y1,v1)
+            c = min(x2,u2)
+            d = min(y2,v2)
+            overlap_area = abs(a-c)*abs(b-d)
+            total_area = (u2-u1)*(v2-v1)
+            perc = overlap_area/float(total_area)
+
+            if perc >= 0.8:
+                return (i, boxes[i][0])
+
+        i += 1
+
+    return (-1, None)
+

@@ -27,6 +27,10 @@ class ControlPanel(QtGui.QFrame):
         self.btnRefreshCamera.setStatusTip("Refresh Camera")
         self.btnRefreshCamera.setEnabled(False)
 
+        self.btnExport = QtGui.QPushButton("Export CSV")
+        self.btnExport.setMinimumHeight(50)
+        self.btnExport.setStatusTip("Export CSV")
+
         self.btnQuit = QtGui.QPushButton("Quit")
         self.btnQuit.setMinimumHeight(50)
         self.btnQuit.setStatusTip("Quit")
@@ -36,11 +40,13 @@ class ControlPanel(QtGui.QFrame):
 
         panelLayout.addWidget(self.btnLoadTray)
         panelLayout.addWidget(self.btnRefreshCamera)
+        panelLayout.addWidget(self.btnExport)
         panelLayout.addWidget(self.btnQuit)
         panelLayout.addWidget(self.lblBarcode)
         panelLayout.addStretch(1)
 
         self.btnLoadTray.clicked.connect(self.selectTrayImage)
+        self.btnExport.clicked.connect(self.data.exportToCSV)
         self.btnQuit.clicked.connect(QtCore.QCoreApplication.instance().quit)
         self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
 
