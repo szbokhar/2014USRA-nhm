@@ -14,7 +14,8 @@ class AppData:
     LOAD_FILE, SELECT_POLYGON, EDIT_MODE, SCANNING_MODE = range(4)
 
     # Types of editing actions for boxes
-    NO_ACTION, DG_NW, DG_N, DG_NE, DG_E, DG_SE, DG_S, DG_SW, DG_W, PAN = range(10)
+    NO_ACTION, DG_NW, DG_N, DG_NE, DG_E, DG_SE, DG_S, DG_SW, DG_W, PAN = \
+        range(10)
 
     # Number of stable frames to wait before performing certain actions
     ACTION_DELAY = 15
@@ -137,7 +138,8 @@ class AppData:
         self.cameraImage = cv2.pyrDown(self.cameraImage)
 
         # Process and modify the camera and static frames
-        (cameraFrame, staticFrame) = self.amendFrame(self.cameraImage, self.trayImage)
+        (cameraFrame, staticFrame) = self.amendFrame(self.cameraImage,
+                                                     self.trayImage)
 
         # Display the modified frame to the user
         self.cameraLabel.setImage(cameraFrame)
@@ -148,80 +150,67 @@ class AppData:
 
         self.bigMPos = (x,y)
 
-    def amendFrame(self, cameraFrame, staticFrame):
+    def amendFrame(self, camera_frame, static_frame):
         """Takes the raw (resized) camera frame, and the plain tray image and
         modifies it for display to the user, as well as updating the internal
         state of the program.
 
         Keywords Arguments:
-        cameraFrame -- image from camera as numpy array
-        staticFrame -- loaded tray scan image"""
+        camera_frame -- image from camera as numpy array
+        static_frame -- loaded tray scan image
 
-        cameraFrame = np.copy(cameraFrame)
-        staticFrame = np.copy(staticFrame)
+        Return: (camera_frame, static_frame)
+        camera_frame -- the processed frame from the camera view
+        static_frame -- the amended tray image"""
+
+        camera_frame = np.copy(camera_frame)
+        static_frame = np.copy(static_frame)
 
         (mx, my) = self.bigMPos
 
         if self.phase == AppData.SELECT_POLYGON:
             # Draw the cursor on the image
-            cv2.line(cameraFrame, (mx-10, my), (mx+10, my), (255,0,0), 1)
-            cv2.line(cameraFrame, (mx, my-10), (mx, my+10), (255,0,0), 1)
+            cv2.line(camera_frame, (mx-10, my), (mx+10, my), (255,0,0), 1)
+            cv2.line(camera_frame, (mx, my-10), (mx, my+10), (255,0,0), 1)
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
-                cv2.circle(cameraFrame, (p.x, p.y), 5, (0,255,0))
+                cv2.circle(camera_frame, (p.x, p.y), 5, (0,255,0))
 
         elif self.phase == AppData.SCANNING_MODE:
 
             # Check if an insect has been moved from/to the tray, and get its
             # position in the camera frame
-            (cameraFrame, centroid) = self.getFrameDifferenceCentroid(cameraFrame)
+            (camera_frame, centroid) = self.getFrameDifferenceCentroid(
+                    camera_frame)
             if centroid != None:
 
                 # If an insect has been removed, find the corresponding insect
                 # in the tray image, and mark it
                 (trayHeight, trayWidth, _) = self.trayImage.shape
-                (u,v) = poly2square(self.polygon_model, trayWidth, trayHeight, centroid).t()
-                cv2.line(staticFrame, (u-10, v), (u+10, v), (0,0,255), 5)
-                cv2.line(staticFrame, (u, v-10), (u, v+10), (0,0,255), 5)
+                (u,v) = poly2square(self.polygon_model, trayWidth, trayHeight,
+                                    centroid).t()
+                cv2.line(static_frame, (u-10, v), (u+10, v), (0,0,255), 5)
+                cv2.line(static_frame, (u, v-10), (u, v+10), (0,0,255), 5)
 
             # Draw all the boxes that have already been placed
-            self.drawPlacedBoxes(staticFrame)
+            self.drawPlacedBoxes(static_frame)
 
             # Draw the currently selected box a different colour
             if self.currentSelectionBox != None:
-                cv2.rectangle(staticFrame, self.currentSelectionBox[0][0:2], self.currentSelectionBox[0][2:4], (0, 0, 255), 2)
+                cv2.rectangle(static_frame, self.currentSelectionBox[0][0:2],
+                              self.currentSelectionBox[0][2:4], (0, 0, 255), 2)
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= AppData.ACTION_DELAY:
-                (cameraFrame, staticFrame) = self.findCorrectBox(centroid, cameraFrame, staticFrame)
-
-            """
-            if self.removedBug != -1:
-                (h, w, _) = cameraFrame.shape
-                midx = w/2
-                midy = h/2
-                cv2.line(cameraFrame, (midx-50, midy-50), (midx+50, midy-50), (255, 0, 0), 2)
-                cv2.line(cameraFrame, (midx+50, midy-50), (midx+50, midy+50), (255, 0, 0), 2)
-                cv2.line(cameraFrame, (midx+50, midy+50), (midx-50, midy+50), (255, 0, 0), 2)
-                cv2.line(cameraFrame, (midx-50, midy+50), (midx-50, midy-50), (255, 0, 0), 2)
-
-                if self.frameCount % 15 == 0:
-                    barcode = cameraFrame[midy-50:midy+50,midx-50:midx+50,:]
-                    img = Image.fromarray(np.uint8(barcode))
-                    dm_read = DataMatrix()
-                    dm_read.decode(img.size[0], img.size[1], buffer(img.tostring()))
-                    if dm_read.count() > 0:
-                        self.boxLabels[self.removedBug] = dm_read.message(1)
-                        self.controlPanel.setLabelText(dm_read.message(1))
-                        """
+                self.findCorrectBox(centroid, camera_frame)
 
         elif self.phase == AppData.EDIT_MODE:
 
             # When editing, draw the boxes
-            self.drawPlacedBoxes(staticFrame)
+            self.drawPlacedBoxes(static_frame)
 
-        return (cameraFrame, staticFrame)
+        return (camera_frame, static_frame)
 
     def drawPlacedBoxes(self, image, regular=(0,255,0), selected=(255,0,0)):
         """Given an input image, draw all of the generated boxes on the image.
@@ -241,15 +230,14 @@ class AppData:
                 cv2.rectangle(image, b[0:2], b[2:4], regular, 2)
 
 
-    def findCorrectBox(self, live_pt, live_frame, static_frame):
+    def findCorrectBox(self, live_pt, live_frame):
         """Finds the correct place to create a box once an insect has been
         removed from the draw, or selects an exsisting box.
 
         Keyword Arguments:
         live_pt -- a point on the live frame representing the location of the
             insect
-        live_frame -- grayscale difference map of the current camera frame
-        static_frame -- the static tray image"""
+        live_frame -- grayscale difference map of the current camera frame"""
 
         if live_pt != None:
             r = self.trayImageScale
@@ -271,12 +259,17 @@ class AppData:
                     w = x2-x1
                     h = y2-y1
                     eps = 0.05
-                    if (abs(x3-x1) < w*eps and abs(y3-y1) < h*eps and abs(x4-x2) < w*eps and abs(y4-y2) < h*eps):
+                    if (abs(x3-x1) < w*eps and abs(y3-y1) < h*eps and
+                            abs(x4-x2) < w*eps and abs(y4-y2) < h*eps):
                         # if the new box is close enough to the stable one,
                         # keep it
                         a = 0.9
                         self.stableBoxRun += 1
-                        self.stableBox = ((int(a*x3+(1-a)*x1), int(a*y3+(1-a)*y1), int(a*x4+(1-a)*x2), int(a*y4+(1-a)*y2)), live_box)
+                        self.stableBox = ((int(a*x3+(1-a)*x1),
+                                           int(a*y3+(1-a)*y1),
+                                           int(a*x4+(1-a)*x2),
+                                           int(a*y4+(1-a)*y2)),
+                                          live_box)
                     else:
                         # If the new box is too different, the reset the stable
                         # counter and the stable box
@@ -288,18 +281,18 @@ class AppData:
 
                     # If the new box significantly overlaps an exsisting box,
                     # use the exsisting box instead
-                    (i, overlapped) = getOverlappingBox(self.placedBoxes, self.stableBox)
+                    (i, overlapped) = getOverlappingBox(self.placedBoxes,
+                                                        self.stableBox)
                     if overlapped == None:
                         self.currentSelectionBox = self.stableBox
-                        self.placedBoxes.append((self.stableBox, "Box " + str(len(self.placedBoxes))))
+                        self.placedBoxes.append((self.stableBox, "Box " +
+                                                 str(len(self.placedBoxes))))
                         self.removedBug = len(self.placedBoxes)-1
                         self.refreshCamera()
                     else:
                         self.currentSelectionBox = overlapped
                         self.removedBug = i
                         self.refreshCamera()
-
-        return (live_frame, static_frame)
 
     def floodFillBox(self, p, camera_mask):
         """Given a grayscale image and a point, return a bounding box
@@ -321,7 +314,8 @@ class AppData:
         frame[frame > 12] = 1
 
         # Find countours in image
-        conts, hir = cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        conts, hir = cv2.findContours(frame, cv2.RETR_LIST,
+                                      cv2.CHAIN_APPROX_NONE)
         staticContour = []
 
         # Find contour that encases the point
@@ -335,7 +329,8 @@ class AppData:
                 # static image
                 for q in conts[i]:
                     (lx,ly) = q[0]
-                    (sx,sy) = poly2square(self.polygon_model, trayWidth, trayHeight, Pt(q[0,0],q[0,1])).t()
+                    (sx,sy) = poly2square(self.polygon_model, trayWidth,
+                                          trayHeight, Pt(q[0,0],q[0,1])).t()
                     sx1 = min(sx1,sx)
                     sy1 = min(sy1,sy)
                     sx2 = max(sx2,sx)
@@ -377,16 +372,20 @@ class AppData:
 
         self.controlPanel.btnStartScanning.setEnabled(True)
 
-    def getFrameDifferenceCentroid(self, camera_frame):
+    def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
         background image of the camera, find the point that represents the
         center of the difference.
 
         Keyword Arguments:
-        camera_frame -- the current camera frame"""
+        frame -- the current camera frame
+
+        Return: (frame, centroid)
+        frame -- processed grayscale frame
+        centroid -- center of difference"""
 
         # Setup a mask to block off certain parts of the difference image
-        (h,w,d) = camera_frame.shape
+        (h,w,d) = frame.shape
         polygon_mask = np.zeros((h,w,d), np.uint8)
 
         poly = None
@@ -412,7 +411,7 @@ class AppData:
         # Convert color image for current frame to grayscale image difference
         # and apply the mask to block off certain areas
         frame = np.absolute(np.subtract(self.camBackground.astype(int),
-                camera_frame.astype(int))).astype(np.uint8)
+                frame.astype(int))).astype(np.uint8)
         frame = np.add.reduce(np.square(np.multiply(
                 np.float32(frame), polygon_mask)), 2)
         frame = np.sqrt(frame)
@@ -430,7 +429,8 @@ class AppData:
             a = 1.0
             self.activeFrameCurrentDiff = np.sum(tframe)/polyArea
             delta = self.activeFrameCurrentDiff - self.activeFrameLastDiff
-            self.activeFrameSmoothDelta = (1-a)*self.activeFrameSmoothDelta + a*delta
+            self.activeFrameSmoothDelta = \
+                    (1-a)*self.activeFrameSmoothDelta + a*delta
             self.activeFrameLastDiff = self.activeFrameCurrentDiff
 
             # If the cchange in difference from last frame to this one is small
@@ -623,7 +623,8 @@ class AppData:
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.staticLabel.setCursor(self.prepanCursor)
             else:
-                (dx, dy) = (self.bigMPos[0] - self.bigMLastPos[0], self.bigMPos[1] - self.bigMLastPos[1])
+                (dx, dy) = (self.bigMPos[0] - self.bigMLastPos[0],
+                            self.bigMPos[1] - self.bigMLastPos[1])
                 (((x1,y1,x2,y2), a), b) = self.placedBoxes[self.selectedEditBox]
                 newBox = (x1,y1,x2,y2)
                 if self.editAction == AppData.DG_NW:
@@ -656,9 +657,7 @@ class AppData:
 
                 self.placedBoxes[self.selectedEditBox] = ((newBox, a), b)
 
-
         self.bigMLastPos = self.bigMPos
-
 
     def editMouseRelease(self):
         """Called when the application is in edit mode and the mouse is released
