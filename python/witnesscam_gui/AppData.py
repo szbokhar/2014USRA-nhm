@@ -7,6 +7,12 @@ import sys
 from Util import *
 from Pt import *
 
+BLUE = (255,0,0)
+GREEN = (0,255,0)
+RED = (0,0,255)
+WHITE = (255,255,255)
+CYAN = (255,255,0)
+
 class AppData:
     """Main logic controler for the digitization gui"""
 
@@ -19,6 +25,14 @@ class AppData:
 
     # Number of stable frames to wait before performing certain actions
     ACTION_DELAY = 15
+
+    DRAW_DELTA = 10
+    BOX_ERROR_TOLERANCE = 0.1
+    BOX_BLENDING_FACTOR = 0.9
+    GRAY_THRESHOLD = 20
+    FRAME_DELTA_BLENDING_FACTOR = 1.0
+    STABLE_FRAME_DELTA_THRESHOLD = 0.4
+    STABLE_FRAME_ACTION_THRESHOLD = 2.0
 
     def __init__(self):
         """Initializes a bunch of member variables for use in later functions"""
@@ -167,15 +181,16 @@ class AppData:
         static_frame = np.copy(static_frame)
 
         (mx, my) = self.bigMPos
+        d = AppData.DRAW_DELTA
 
         if self.phase == AppData.SELECT_POLYGON:
             # Draw the cursor on the image
-            cv2.line(camera_frame, (mx-10, my), (mx+10, my), (255,0,0), 1)
-            cv2.line(camera_frame, (mx, my-10), (mx, my+10), (255,0,0), 1)
+            cv2.line(camera_frame, (mx-d, my), (mx+d, my), BLUE, 1)
+            cv2.line(camera_frame, (mx, my-d), (mx, my+d), BLUE, 1)
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
-                cv2.circle(camera_frame, (p.x, p.y), 5, (0,255,0))
+                cv2.circle(camera_frame, (p.x, p.y), 5, GREEN)
 
         elif self.phase == AppData.SCANNING_MODE:
 
@@ -190,25 +205,21 @@ class AppData:
                 (trayHeight, trayWidth, _) = self.trayImage.shape
                 (u,v) = poly2square(self.polygon_model, trayWidth, trayHeight,
                                     centroid).t()
-                cv2.line(static_frame, (u-10, v), (u+10, v), (0,0,255), 5)
-                cv2.line(static_frame, (u, v-10), (u, v+10), (0,0,255), 5)
+                cv2.line(static_frame, (u-d, v), (u+d, v), RED, 5)
+                cv2.line(static_frame, (u, v-d), (u, v+d), RED, 5)
 
             # Draw all the boxes that have already been placed
-            self.drawPlacedBoxes(static_frame)
-
-            # Draw the currently selected box a different colour
-            if self.currentSelectionBox != None:
-                cv2.rectangle(static_frame, self.currentSelectionBox[0][0:2],
-                              self.currentSelectionBox[0][2:4], (0, 0, 255), 2)
+            self.drawPlacedBoxes(static_frame, GREEN, RED)
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= AppData.ACTION_DELAY:
-                self.findCorrectBox(centroid, camera_frame)
+                self.findCorrectBox(centroid, camera_frame, static_frame)
+
 
         elif self.phase == AppData.EDIT_MODE:
 
             # When editing, draw the boxes
-            self.drawPlacedBoxes(static_frame)
+            self.drawPlacedBoxes(static_frame, GREEN, BLUE)
 
         return (camera_frame, static_frame)
 
@@ -223,14 +234,24 @@ class AppData:
         """
 
         for i in range(len(self.placedBoxes)):
-            ((b, _), _) = self.placedBoxes[i]
-            if i == self.selectedEditBox:
+            b = self.placedBoxes[i].static
+            p = self.placedBoxes[i].point
+            a = AppData.DRAW_DELTA*2
+            col = None
+            if i == self.removedBug:
+                col = selected
+            elif i == self.selectedEditBox:
                 cv2.rectangle(image, b[0:2], b[2:4], selected, 2)
+                col = selected
             else:
-                cv2.rectangle(image, b[0:2], b[2:4], regular, 2)
+                col = regular
+
+            cv2.line(image, (p.x-a, p.y-a), (p.x+a, p.y+a), col, 2)
+            cv2.line(image, (p.x+a, p.y-a), (p.x-a, p.y+a), col, 2)
+            cv2.circle(image, p.t(), int(math.sqrt(2)*a), col, 2)
 
 
-    def findCorrectBox(self, live_pt, live_frame):
+    def findCorrectBox(self, live_pt, live_frame, static_frame):
         """Finds the correct place to create a box once an insect has been
         removed from the draw, or selects an exsisting box.
 
@@ -246,52 +267,60 @@ class AppData:
             (static_box, live_box) = self.floodFillBox(live_pt, live_frame)
 
             if static_box != None:
+                (trayHeight, trayWidth, _) = self.trayImage.shape
+                static_pt = poly2square(self.polygon_model, trayWidth,
+                                        trayHeight, live_pt)
 
                 # Determine whether this box is stable (not jumping around and
                 # wildly changing)
                 if self.stableBox == None:
                     # If no stable box has been set, set one
-                    self.stableBox = (static_box, live_box)
+                    self.stableBox = (static_box, live_box, static_pt)
                 else:
+
                     # Compare the new box to the stable one
-                    ((x1,y1,x2,y2), _) = self.stableBox
+                    (x1,y1,x2,y2) = self.stableBox[0]
                     (x3,y3,x4,y4) = static_box
+                    cv2.rectangle(static_frame, (x1,y1), (x2,y2), CYAN, 2)
+                    cv2.rectangle(static_frame, (x3,y3), (x4,y4), WHITE, 2)
                     w = x2-x1
                     h = y2-y1
-                    eps = 0.05
+                    eps = AppData.BOX_ERROR_TOLERANCE
                     if (abs(x3-x1) < w*eps and abs(y3-y1) < h*eps and
                             abs(x4-x2) < w*eps and abs(y4-y2) < h*eps):
-                        # if the new box is close enough to the stable one,
+                        # If the new box is close enough to the stable one,
                         # keep it
-                        a = 0.9
+                        a = AppData.BOX_BLENDING_FACTOR
                         self.stableBoxRun += 1
                         self.stableBox = ((int(a*x3+(1-a)*x1),
                                            int(a*y3+(1-a)*y1),
                                            int(a*x4+(1-a)*x2),
                                            int(a*y4+(1-a)*y2)),
-                                          live_box)
+                                          live_box,
+                                          static_pt)
                     else:
                         # If the new box is too different, the reset the stable
                         # counter and the stable box
                         self.stableBoxRun = 0
-                        self.stableBox = (static_box, live_box)
+                        self.stableBox = (static_box, live_box, static_pt)
 
                 # If the box has been stable for long enough, accept it
                 if self.stableBoxRun >= AppData.ACTION_DELAY:
 
                     # If the new box significantly overlaps an exsisting box,
                     # use the exsisting box instead
-                    (i, overlapped) = getOverlappingBox(self.placedBoxes,
-                                                        self.stableBox)
-                    if overlapped == None:
-                        self.currentSelectionBox = self.stableBox
-                        self.placedBoxes.append((self.stableBox, "Box " +
-                                                 str(len(self.placedBoxes))))
-                        self.removedBug = len(self.placedBoxes)-1
+                    i = getOverlappingBox([b.static for b in self.placedBoxes],
+                                          self.stableBox[0])
+                    if i == -1:
+                        box = BugBox("Box " + str(len(self.placedBoxes)),
+                                     self.stableBox[1],
+                                     self.stableBox[0],
+                                     self.stableBox[2])
+                        self.placedBoxes.append(box)
+                        self.setCurrentSelectionBox(len(self.placedBoxes)-1)
                         self.refreshCamera()
                     else:
-                        self.currentSelectionBox = overlapped
-                        self.removedBug = i
+                        self.setCurrentSelectionBox(i)
                         self.refreshCamera()
 
     def floodFillBox(self, p, camera_mask):
@@ -311,12 +340,12 @@ class AppData:
 
         # Convert grayscale image to binary mask
         frame = np.copy(camera_mask)
-        frame[frame > 12] = 1
+        frame[frame > AppData.GRAY_THRESHOLD] = 1
 
         # Find countours in image
+        staticContour = []
         conts, hir = cv2.findContours(frame, cv2.RETR_LIST,
                                       cv2.CHAIN_APPROX_NONE)
-        staticContour = []
 
         # Find contour that encases the point
         for i in range(len(conts)):
@@ -360,7 +389,8 @@ class AppData:
         self.staticLabel = tmp
 
         # Get the axis aligned bounding box for the tray area selection
-        (minx, miny, maxx, maxy) = (1000, 1000, 0, 0)
+        (minx, miny, maxx, maxy) = \
+                (self.polyPoints[0].x, self.polyPoints[0].y, 0, 0)
         for p in self.polyPoints:
             minx = p.x if p.x < minx else minx
             miny = p.y if p.y < miny else miny
@@ -399,7 +429,7 @@ class AppData:
 
         # Block off the box containing the removed insect
         if self.currentSelectionBox != None:
-            b = self.currentSelectionBox[1]
+            b = self.currentSelectionBox.live
             q0 = (int(b[0]), int(b[1]))
             q1 = (int(b[2]), int(b[1]))
             q2 = (int(b[2]), int(b[3]))
@@ -416,7 +446,8 @@ class AppData:
                 np.float32(frame), polygon_mask)), 2)
         frame = np.sqrt(frame)
         frame = cv2.GaussianBlur(frame, (5,5), 0)
-        frame[frame < 12] = 0
+        frame = frame / math.sqrt(3)
+        frame[frame < AppData.GRAY_THRESHOLD] = 0
         tframe = np.copy(frame)
 
         # Use the processed image difference frame to find the center of the
@@ -426,7 +457,7 @@ class AppData:
 
             # Compute the total difference of this frame, and the change from
             # last frame to this one
-            a = 1.0
+            a = AppData.FRAME_DELTA_BLENDING_FACTOR
             self.activeFrameCurrentDiff = np.sum(tframe)/polyArea
             delta = self.activeFrameCurrentDiff - self.activeFrameLastDiff
             self.activeFrameSmoothDelta = \
@@ -435,13 +466,18 @@ class AppData:
 
             # If the cchange in difference from last frame to this one is small
             # consider it stable and increment the stable counter
-            if abs(self.activeFrameSmoothDelta) < 0.1:
+            if abs(self.activeFrameSmoothDelta) \
+                    < AppData.STABLE_FRAME_DELTA_THRESHOLD:
                 self.stableRun += 1
             else:
                 self.stableRun = 0
+                self.stableBoxRun = 0
+                self.stableBox = None
 
             # If the frame has been stable for long enough, then
-            if self.stableRun > AppData.ACTION_DELAY:
+            if self.stableRun > AppData.ACTION_DELAY and \
+                    self.activeFrameCurrentDiff \
+                    > AppData.STABLE_FRAME_ACTION_THRESHOLD:
                 medpos = findWeightedMedianPoint2D(tframe, self.trayBoundingBox)
 
             # Overall frame count
@@ -464,17 +500,16 @@ class AppData:
     def refreshCameraButton(self):
         """When the refresh camer button is pressed"""
         self.refreshCamera()
-        self.removedBug = -1
-        self.currentSelectionBox = None
+        self.setCurrentSelectionBox(-1)
 
     def toggleScanningMode(self):
         """Called when the Start/Stop Barcode Scanning button is pressed"""
         if self.phase == AppData.SCANNING_MODE:
             self.phase = AppData.EDIT_MODE
+            self.setCurrentSelectionBox(-1)
         elif self.phase == AppData.EDIT_MODE:
             self.phase = AppData.SCANNING_MODE
             self.refreshCameraButton()
-            self.currentSelectionBox = None
             self.selectedEditBox = None
 
         self.controlPanel.scanningModeToggled(self.phase)
@@ -485,8 +520,8 @@ class AppData:
         print(fname)
 
         f = open(fname, 'w')
-        for ((b, _), code) in self.placedBoxes:
-            f.write(code + ", " + str(b) + '\n')
+        for b in self.placedBoxes:
+            f.write(b.name + ", " + str(b.static) + '\n')
 
     def bigLabelMousePress(self, ev, scale):
         """When the mouse is clicked on the big label.
@@ -498,7 +533,7 @@ class AppData:
         if self.phase == AppData.SELECT_POLYGON:
             self.polyPoints.append(
                     Pt(int(ev.pos().x()/scale),
-                    int(ev.pos().y()/scale)))
+                       int(ev.pos().y()/scale)))
 
             if len(self.polyPoints) == 4:
                 self.gotTrayArea()
@@ -541,7 +576,7 @@ class AppData:
             # If a box is selected, check for clicking on an editable point
             # (e. corners for resizing, center for panning)
             p = self.bigMPos
-            (((x1,y1,x2,y2), _), _) = self.placedBoxes[self.selectedEditBox]
+            (x1,y1,x2,y2) = self.placedBoxes[self.selectedEditBox].static
             if ev.button() == QtCore.Qt.MouseButton.LeftButton:
                 # Process left click
                 if pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
@@ -577,10 +612,11 @@ class AppData:
         # to select it
         clickedOn = False
         for i in range(len(self.placedBoxes)):
-            (((x1,y1,x2,y2), _), _) = self.placedBoxes[i]
+            (x1,y1,x2,y2) = self.placedBoxes[i].static
             if pointInBox((mx, my), (x1-c,y1-c,x2+c,y2+c)):
                 clickedOn = True
                 self.selectedEditBox = i
+                self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
 
         # Check for deselect of box
         if not clickedOn:
@@ -595,15 +631,15 @@ class AppData:
 
         # Show box select cursor if hovered over box
         self.staticLabel.setCursor(self.normalCursor)
-        for ((b, _), _) in self.placedBoxes:
-            if pointInBox(p, b):
+        for b in self.placedBoxes:
+            if pointInBox(p, b.static):
                 self.staticLabel.setCursor(self.selectCursor)
 
         # If box is selected, show various cursors for editing functions
         if self.selectedEditBox != None:
             if self.editAction == AppData.NO_ACTION:
                 c = 15
-                (((x1,y1,x2,y2), _), _) = self.placedBoxes[self.selectedEditBox]
+                (x1,y1,x2,y2) = self.placedBoxes[self.selectedEditBox].static
                 if pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
                     self.staticLabel.setCursor(self.resizeCursorF)
                 elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
@@ -625,8 +661,11 @@ class AppData:
             else:
                 (dx, dy) = (self.bigMPos[0] - self.bigMLastPos[0],
                             self.bigMPos[1] - self.bigMLastPos[1])
-                (((x1,y1,x2,y2), a), b) = self.placedBoxes[self.selectedEditBox]
-                newBox = (x1,y1,x2,y2)
+                b = self.placedBoxes[self.selectedEditBox]
+                (x1,y1,x2,y2) = b.static
+                newBox = b.static
+                (px, py) = b.point.t()
+                newPoint = b.point.t()
                 if self.editAction == AppData.DG_NW:
                     newBox = (x1+dx,y1+dy,x2,y2)
                     self.staticLabel.setCursor(self.resizeCursorF)
@@ -653,9 +692,11 @@ class AppData:
                     self.staticLabel.setCursor(self.resizeCursorH)
                 elif self.editAction == AppData.PAN:
                     newBox = (x1+dx,y1+dy,x2+dx,y2+dy)
+                    newPoint = (px + dx, py + dy)
                     self.staticLabel.setCursor(self.midpanCursor)
 
-                self.placedBoxes[self.selectedEditBox] = ((newBox, a), b)
+                b.static = newBox
+                b.point = Pt(newPoint[0], newPoint[1])
 
         self.bigMLastPos = self.bigMPos
 
@@ -663,3 +704,23 @@ class AppData:
         """Called when the application is in edit mode and the mouse is released
         on the big label."""
         self.editAction = AppData.NO_ACTION
+
+    def newBugIdEntered(self, bid):
+        if self.currentSelectionBox != None:
+            self.currentSelectionBox.name = bid
+        elif self.selectedEditBox != -1:
+            self.placedBoxes[self.selectedEditBox].name = bid
+
+    def setCurrentSelectionBox(self, i=-1):
+        if self.removedBug != -1:
+            del self.placedBoxes[self.removedBug]
+            self.placedBoxes.insert(self.removedBug, self.currentSelectionBox)
+
+        if i != -1:
+            self.currentSelectionBox = self.placedBoxes[i]
+
+            self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+        else:
+            self.currentSelectionBox = None
+
+        self.removedBug = i

@@ -47,9 +47,13 @@ class ControlPanel(QtGui.QFrame):
         self.btnQuit.setMinimumHeight(50)
         self.btnQuit.setStatusTip("Quit")
 
+        # Create the Textbox label
+        self.lblTextLabel = QtGui.QLabel()
+        self.lblTextLabel.setText('ID:')
+
         # Create the Barcode label
-        self.lblBarcode = QtGui.QLabel()
-        self.lblBarcode.setText('Hoaaaaa')
+        self.txtBarcode = QtGui.QLineEdit()
+        self.txtBarcode.setText('')
 
         # Place all buttons and labels on the panel
         panelLayout.addWidget(self.btnLoadTray)
@@ -57,7 +61,9 @@ class ControlPanel(QtGui.QFrame):
         panelLayout.addWidget(self.btnRefreshCamera)
         panelLayout.addWidget(self.btnExport)
         panelLayout.addWidget(self.btnQuit)
-        panelLayout.addWidget(self.lblBarcode)
+        panelLayout.addStretch(1)
+        panelLayout.addWidget(self.lblTextLabel)
+        panelLayout.addWidget(self.txtBarcode)
         panelLayout.addStretch(1)
 
         # Connect slots for the buttion actions
@@ -66,6 +72,7 @@ class ControlPanel(QtGui.QFrame):
         self.btnExport.clicked.connect(self.data.exportToCSV)
         self.btnQuit.clicked.connect(QtCore.QCoreApplication.instance().quit)
         self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
+        self.txtBarcode.textEdited.connect(self.data.newBugIdEntered)
 
         self.sigLoadTrayImage.connect(self.data.setTrayScan)
 
@@ -87,8 +94,9 @@ class ControlPanel(QtGui.QFrame):
             self.btnRefreshCamera.setEnabled(True)
 
 
-    def setLabelText(self, string):
-        self.lblBarcode.setText(string)
+    def setCurrentBugId(self, string):
+        self.txtBarcode.setText(string)
+        self.txtBarcode.selectAll()
 
 class BigLabel(QtGui.QLabel):
     """The large sized label with convienence function for displaying images

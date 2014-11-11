@@ -191,9 +191,9 @@ def getOverlappingBox(boxes, box, threshold=0.5):
          (-1 if no box overlaps)
     percentage -- the percentage of 'box' that overlaps the first overlapping
         box in 'boxes'"""
-    (x1,y1,x2,y2), _ = box
+    (x1,y1,x2,y2) = box
     i = 0
-    for ((b, _), _) in boxes:
+    for b in boxes:
         (u1,v1,u2,v2) = b
 
         if not (x1 > u2 or u1 > x2 or y1 > v2 or v1 > y2):
@@ -208,11 +208,11 @@ def getOverlappingBox(boxes, box, threshold=0.5):
             # Only consider overlapping if more than 50% of the test box
             # overlaps this one
             if perc >= threshold:
-                return (i, boxes[i][0])
+                return i
 
         i += 1
 
-    return (-1, None)
+    return -1
 
 def pointInBox(p, box):
     """Determines whether a point lies inside an axis aligned box.
@@ -227,3 +227,16 @@ def pointInBox(p, box):
     (x,y) = p
 
     return x > x1 and x < x2 and y > y1 and y < y2
+
+class BugBox:
+    def __init__(self, name, livebox, staticbox, pt):
+        self.name = name
+        self.live = livebox
+        self.static = staticbox
+        self.point = pt
+
+    def __str__(self):
+       return "BugBox('" + self.name + "', static=" + str(self.static) + ", live=" + str(self.live) + ")"
+
+    def __repr__(self):
+        return str(self)
