@@ -1,5 +1,6 @@
 from MainWindow import *
 
+
 def main():
     logfile = None
     if len(sys.argv) > 1:
@@ -11,4 +12,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

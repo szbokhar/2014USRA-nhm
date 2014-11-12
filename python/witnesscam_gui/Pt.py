@@ -1,5 +1,6 @@
 import math
 
+
 class Pt:
     def __init__(self, x, y):
         pp('init')
@@ -43,7 +44,8 @@ class Pt:
         if type(self) == type(other):
             return Pt(self.x + other.x, self.y + other.y)
         else:
-            raise TypeError('Cannot add ' + str(type(self)) + " to " + str(type(other)))
+            raise TypeError('Cannot add ' +
+                            str(type(self)) + " to " + str(type(other)))
 
     def __neg__(self):
         return Pt(-self.x, -self.y)

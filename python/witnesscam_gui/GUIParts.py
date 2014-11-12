@@ -4,6 +4,7 @@ from AppData import *
 from Util import *
 from Pt import *
 
+
 class ControlPanel(QtGui.QFrame):
     """A QtWidget that holds all the control buttons for the application."""
 
@@ -77,8 +78,8 @@ class ControlPanel(QtGui.QFrame):
         self.sigLoadTrayImage.connect(self.data.setTrayScan)
 
     def selectTrayImage(self):
-        fname, _ = QtGui.QFileDialog.getOpenFileName(self,
-                "Open Specimin File", ".")
+        fname, _ = QtGui.QFileDialog.getOpenFileName(
+            self, "Open Specimin File", ".")
 
         if fname != "":
             fpath = fname.split("/")
@@ -93,10 +94,10 @@ class ControlPanel(QtGui.QFrame):
             self.btnStartScanning.setText("Stop Barcode Scanning")
             self.btnRefreshCamera.setEnabled(True)
 
-
     def setCurrentBugId(self, string):
         self.txtBarcode.setText(string)
         self.txtBarcode.selectAll()
+
 
 class BigLabel(QtGui.QLabel):
     """The large sized label with convienence function for displaying images
@@ -122,11 +123,11 @@ class BigLabel(QtGui.QLabel):
     def setImage(self, cvImage):
         cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2RGB)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
-        (w,h,rat) = computeImageScaleFactor(originalSize, self.labelSize)
+        (w, h, rat) = computeImageScaleFactor(originalSize, self.labelSize)
         self.imageScaleRatio = rat
-        cvImage = cv2.resize(cvImage, (w,h))
+        cvImage = cv2.resize(cvImage, (w, h))
         img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
-                cvImage.strides[0], QtGui.QImage.Format_RGB888)
+                           cvImage.strides[0], QtGui.QImage.Format_RGB888)
 
         self.setPixmap(QtGui.QPixmap.fromImage(img))
 
@@ -162,10 +163,10 @@ class SmallLabel(QtGui.QLabel):
         else:
             cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2RGB)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
-        (w,h,rat) = computeImageScaleFactor(originalSize, self.labelSize)
+        (w, h, rat) = computeImageScaleFactor(originalSize, self.labelSize)
         self.imageScaleRatio = rat
-        cvImage = cv2.resize(cvImage, (w,h))
+        cvImage = cv2.resize(cvImage, (w, h))
         img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
-                cvImage.strides[0], QtGui.QImage.Format_RGB888)
+                           cvImage.strides[0], QtGui.QImage.Format_RGB888)
 
         self.setPixmap(QtGui.QPixmap.fromImage(img))

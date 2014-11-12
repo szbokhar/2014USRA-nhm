@@ -3,6 +3,7 @@ from PySide import QtCore, QtGui
 from AppData import *
 from GUIParts import *
 
+
 class MainWindow(QtGui.QMainWindow):
 
     def __init__(self, fname=None):
@@ -40,4 +41,3 @@ class MainWindow(QtGui.QMainWindow):
         self.setFixedSize(self.size())
         self.setWindowTitle('Insect Segmentation')
         self.show()
-

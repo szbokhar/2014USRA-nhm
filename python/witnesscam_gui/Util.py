@@ -1,5 +1,6 @@
 from Pt import *
 
+
 def computeImageScaleFactor(original, box):
     """Compute the factor to scale the original image by so that it fits in the
     perfectly in the provided box without changing the original aspect ratio.
@@ -17,6 +18,7 @@ def computeImageScaleFactor(original, box):
     (w, h) = original
     rat = min(float(bW)/w, float(bH)/h)
     return (int(w*rat), int(h*rat), rat)
+
 
 def buildPolygonSquareModel(points):
     """Given the points of a quadrilateral, compute the coefficents necessary
@@ -47,7 +49,8 @@ def buildPolygonSquareModel(points):
     G = GG-1
     H = HH-1
 
-    return (p0,A,B,C,D,E,F,G,H)
+    return (p0, A, B, C, D, E, F, G, H)
+
 
 def poly2square(model, scalex, scaley, pos):
     """Maps a point inside a quadrilateral to a unique point on a rectangle.
@@ -61,13 +64,14 @@ def poly2square(model, scalex, scaley, pos):
 
     Return: point
     point -- the corresponding point inside the rectangle"""
-    (p0,A,B,C,D,E,F,G,H) = model
-    (x,y) = (pos.x-p0.x, pos.y-p0.y)
+    (p0, A, B, C, D, E, F, G, H) = model
+    (x, y) = (pos.x-p0.x, pos.y-p0.y)
 
     v = (-A*F+A*y+C*D-C*G*y-D*x+F*G*x)/(A*E-A*H*y-B*D+B*G*y+D*H*x-E*G*x)
     u = (-C-B*v+x+H*v*x)/(A-G*x)
 
     return Pt(int(u*scalex), int(v*scaley))
+
 
 def square2poly(model, scalex, scaley, pos):
     """Maps a point inside a rectangle to a unique point on a quadrilateral.
@@ -81,13 +85,14 @@ def square2poly(model, scalex, scaley, pos):
 
     Return: point
     point -- the corresponding point on the quadrilateral"""
-    (p0,A,B,C,D,E,F,G,H) = model
-    (u,v) = (pos.x/float(scalex), pos.y/float(scaley))
+    (p0, A, B, C, D, E, F, G, H) = model
+    (u, v) = (pos.x/float(scalex), pos.y/float(scaley))
 
     x = (A*u+B*v+C)/(G*u+H*v+1) + p0.x
     y = (D*u+E*v+F)/(G*u+H*v+1) + p0.y
 
-    return Pt(int(x),int(y))
+    return Pt(int(x), int(y))
+
 
 def quadrilateralArea(points):
     """Compute the area of a convex quadrilateral.
@@ -101,6 +106,7 @@ def quadrilateralArea(points):
     [p0, p1, p2, p3] = points
     return triangleArea([p0, p1, p2]) + triangleArea([p2, p3, p0])
 
+
 def triangleArea(points):
     """Compute the area of a triangle.
 
@@ -112,6 +118,7 @@ def triangleArea(points):
     area -- a float representing the area of the quadrilateral"""
     [(x0, y0), (x1, y1), (x2, y2)] = points
     return 0.5*(x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1))
+
 
 def findWeightedMedianPoint2D(image, roi):
     """Finds the weighted median position in a 2D grayscale image within a
@@ -130,15 +137,16 @@ def findWeightedMedianPoint2D(image, roi):
     ylist = []
     for x in range(roi[0].x, roi[1].x, 5):
         for y in range(roi[0].y, roi[1].y, 5):
-            if image[y,x] > 0:
-                totalIntensity += image[y,x]
-                xlist.append((x, image[y,x]))
-                ylist.append((y, image[y,x]))
+            if image[y, x] > 0:
+                totalIntensity += image[y, x]
+                xlist.append((x, image[y, x]))
+                ylist.append((y, image[y, x]))
 
     if xlist and ylist:
         return Pt(weightedMedian1D(xlist), weightedMedian1D(ylist))
 
     return None
+
 
 def weightedMedian1D(lst):
     """Finds the median position/50th percentile of the elements in the list.
@@ -152,7 +160,7 @@ def weightedMedian1D(lst):
     lst.sort()
 
     # Convert distribution of weights into cumulative distribution
-    for i in range(1,len(lst)):
+    for i in range(1, len(lst)):
         (cord, weight) = lst[i]
         (_, prev_weight) = lst[i-1]
         lst[i] = (cord, weight+prev_weight)
@@ -175,6 +183,7 @@ def weightedMedian1D(lst):
                 break
         return lst[high][0]
 
+
 def getOverlappingBox(boxes, box, threshold=0.5):
     """Determines whether the supplied box overlaps 'threshold'% of any of the
     boxes in the supplied list of boxes.
@@ -191,16 +200,16 @@ def getOverlappingBox(boxes, box, threshold=0.5):
          (-1 if no box overlaps)
     percentage -- the percentage of 'box' that overlaps the first overlapping
         box in 'boxes'"""
-    (x1,y1,x2,y2) = box
+    (x1, y1, x2, y2) = box
     i = 0
     for b in boxes:
-        (u1,v1,u2,v2) = b
+        (u1, v1, u2, v2) = b
 
         if not (x1 > u2 or u1 > x2 or y1 > v2 or v1 > y2):
-            a = max(x1,u1)
-            b = max(y1,v1)
-            c = min(x2,u2)
-            d = min(y2,v2)
+            a = max(x1, u1)
+            b = max(y1, v1)
+            c = min(x2, u2)
+            d = min(y2, v2)
             overlap_area = abs(a-c)*abs(b-d)
             total_area = (u2-u1)*(v2-v1)
             perc = overlap_area/float(total_area)
@@ -214,6 +223,7 @@ def getOverlappingBox(boxes, box, threshold=0.5):
 
     return -1
 
+
 def pointInBox(p, box):
     """Determines whether a point lies inside an axis aligned box.
 
@@ -223,10 +233,11 @@ def pointInBox(p, box):
 
     Return: inBox
     inBox -- True if the point is in the box, False otherwise"""
-    (x1,y1,x2,y2) = box
-    (x,y) = p
+    (x1, y1, x2, y2) = box
+    (x, y) = p
 
     return x > x1 and x < x2 and y > y1 and y < y2
+
 
 class BugBox:
     def __init__(self, name, livebox, staticbox, pt):
@@ -236,7 +247,9 @@ class BugBox:
         self.point = pt
 
     def __str__(self):
-       return "BugBox('" + self.name + "', static=" + str(self.static) + ", live=" + str(self.live) + ")"
+        return "BugBox('" + self.name +\
+            "', static=" + str(self.static) +\
+            ", live=" + str(self.live) + ")"
 
     def __repr__(self):
         return str(self)
