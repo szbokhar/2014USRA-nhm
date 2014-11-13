@@ -19,14 +19,14 @@ class AppData:
     """Main logic controler for the digitization gui"""
 
     # States/Phases the application can be in
-    LOAD_FILE, SELECT_POLYGON, EDIT_MODE, SCANNING_MODE = range(4)
+    LOAD_FILE, SELECT_POLYGON, SCANNING_MODE = range(3)
 
     # Types of editing actions for boxes
     NO_ACTION, DG_NW, DG_N, DG_NE, DG_E, DG_SE, DG_S, DG_SW, DG_W, PAN = \
         range(10)
 
     # Number of stable frames to wait before performing certain actions
-    ACTION_DELAY = 15
+    ACTION_DELAY = 25
 
     DRAW_DELTA = 10
     BOX_ERROR_TOLERANCE = 0.1
@@ -34,7 +34,7 @@ class AppData:
     GRAY_THRESHOLD = 20
     FRAME_DELTA_BLENDING_FACTOR = 1.0
     STABLE_FRAME_DELTA_THRESHOLD = 0.4
-    STABLE_FRAME_ACTION_THRESHOLD = 2.0
+    STABLE_FRAME_ACTION_THRESHOLD = 0.5
 
     def __init__(self):
         """Initializes a bunch of member variables for use in later
@@ -225,21 +225,15 @@ class AppData:
                 cv2.line(static_frame, (u, v-d), (u, v+d), RED, 5)
 
             # Draw all the boxes that have already been placed
-            self.drawPlacedBoxes(static_frame, GREEN, RED)
+            self.drawPlacedBoxes(static_frame, GREEN, RED, BLUE)
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= AppData.ACTION_DELAY:
                 self.findCorrectBox(centroid, camera_frame, static_frame)
 
-        elif self.phase == AppData.EDIT_MODE:
-
-            # When editing, draw the boxes
-            self.drawPlacedBoxes(static_frame, GREEN, BLUE)
-
         return (camera_frame, static_frame)
 
-    def drawPlacedBoxes(self, image, regular=(0, 255, 0),
-                        selected=(255, 0, 0)):
+    def drawPlacedBoxes(self, image, regular, selected, active):
         """Given an input image, draw all of the generated boxes on the image.
         Optional colour paramaters can also be supplied.
 
@@ -257,17 +251,32 @@ class AppData:
                 (x1, y1, x2, y2) = self.placedBoxes[i].static
                 self.placedBoxes[i].static =\
                     (int(x1*s), int(y1*s), int(x2*s), int(y2*s))
+                (x1, y1, x2, y2) = self.placedBoxes[i].static
+
+                (h, w, _) = self.trayImage.shape
+                p1 = square2poly(self.polygon_model, w, h, Pt(x1, y1))
+                p2 = square2poly(self.polygon_model, w, h, Pt(x1, y2))
+                p3 = square2poly(self.polygon_model, w, h, Pt(x2, y2))
+                p4 = square2poly(self.polygon_model, w, h, Pt(x2, y1))
+                x1 = min(p1.x, p2.x, p3.x, p4.x)
+                x2 = max(p1.x, p2.x, p3.x, p4.x)
+                y1 = min(p1.y, p2.y, p3.y, p4.y)
+                y2 = max(p1.y, p2.y, p3.y, p4.y)
+                self.placedBoxes[i].live = (x1, y1, x2, y2)
 
             b = self.placedBoxes[i].static
             (px, py) = self.placedBoxes[i].point
             a = AppData.DRAW_DELTA*2
             col = None
-            if i == self.removedBug:
-                col = selected
-            elif i == self.selectedEditBox:
+
+            if i == self.selectedEditBox:
                 cv2.rectangle(image, b[0:2], b[2:4], selected, 2)
                 col = selected
-            else:
+
+            if i == self.removedBug:
+                col = active
+
+            if i != self.removedBug and i != self.selectedEditBox:
                 col = regular
 
             cv2.line(image, (px-a, py-a), (px+a, py+a), col, 2)
@@ -406,8 +415,8 @@ class AppData:
         # Save the current view of the camera
         self.camBackground = np.copy(self.cameraImage)
 
-        # Change phase to edit mode
-        self.phase = AppData.EDIT_MODE
+        # Change phase to scanning mode
+        self.phase = AppData.SCANNING_MODE
 
         # Swap the labels to place the insect tray image in the bigger label
         tmp = self.cameraLabel
@@ -426,7 +435,7 @@ class AppData:
         self.trayBoundingBox = [Pt(minx, miny), Pt(maxx, maxy)]
         self.polygon_model = buildPolygonSquareModel(self.polyPoints)
 
-        self.controlPanel.btnStartScanning.setEnabled(True)
+        self.controlPanel.btnRefreshCamera.setEnabled(True)
 
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
@@ -529,18 +538,6 @@ class AppData:
         self.refreshCamera()
         self.setCurrentSelectionBox(-1)
 
-    def toggleScanningMode(self):
-        """Called when the Start/Stop Barcode Scanning button is pressed"""
-        if self.phase == AppData.SCANNING_MODE:
-            self.phase = AppData.EDIT_MODE
-            self.setCurrentSelectionBox(-1)
-        elif self.phase == AppData.EDIT_MODE:
-            self.phase = AppData.SCANNING_MODE
-            self.refreshCameraButton()
-            self.selectedEditBox = None
-
-        self.controlPanel.scanningModeToggled(self.phase)
-
     def exportToCSV(self):
         """Called when the Export to CSV button is pressed"""
         fname, _ = QtGui.QFileDialog.getSaveFileName()
@@ -566,7 +563,7 @@ class AppData:
             if len(self.polyPoints) == 4:
                 self.gotTrayArea()
 
-        elif self.phase == AppData.EDIT_MODE:
+        elif self.phase == AppData.SCANNING_MODE:
             self.editMousePress(ev)
 
     def bigLabelMouseMove(self, ev, scale):
@@ -579,7 +576,7 @@ class AppData:
         self.setMousepos(int(ev.pos().x()/scale),
                          int(ev.pos().y()/scale))
 
-        if self.phase == AppData.EDIT_MODE:
+        if self.phase == AppData.SCANNING_MODE:
             self.editMouseMove()
 
     def bigLabelMouseRelease(self, ev):
@@ -587,7 +584,7 @@ class AppData:
 
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent object"""
-        if self.phase == AppData.EDIT_MODE:
+        if self.phase == AppData.SCANNING_MODE:
             self.editMouseRelease()
 
     def editMousePress(self, ev):
@@ -631,8 +628,13 @@ class AppData:
             elif ev.button() == QtCore.Qt.MouseButton.RightButton:
                 # Process right click
                 if pointInBox(p, (x1, y1, x2, y2)):
+                    if self.removedBug == self.selectedEditBox:
+                        self.setCurrentSelectionBox(-1)
+                        self.refreshCamera()
                     del self.placedBoxes[self.selectedEditBox]
                     self.selectedEditBox = None
+
+                    self.refreshCamera()
 
                     return
 
@@ -645,6 +647,7 @@ class AppData:
                 clickedOn = True
                 self.selectedEditBox = i
                 self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+                self.setCurrentSelectionBox(-1)
 
         # Check for deselect of box
         if not clickedOn:
@@ -746,8 +749,8 @@ class AppData:
 
         if i != -1:
             self.currentSelectionBox = self.placedBoxes[i]
-
             self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+            self.selectedEditBox = None
         else:
             self.currentSelectionBox = None
 

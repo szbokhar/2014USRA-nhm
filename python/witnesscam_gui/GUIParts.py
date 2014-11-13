@@ -26,12 +26,6 @@ class ControlPanel(QtGui.QFrame):
         self.btnLoadTray.setMinimumHeight(50)
         self.btnLoadTray.setStatusTip("Load Tray Scan")
 
-        # Create the Start Scanning buttion
-        self.btnStartScanning = QtGui.QPushButton("Start Barcode Scanning")
-        self.btnStartScanning.setMinimumHeight(50)
-        self.btnStartScanning.setStatusTip("Start Barcode Scanning")
-        self.btnStartScanning.setEnabled(False)
-
         # Create the Refresh Camera buttion
         self.btnRefreshCamera = QtGui.QPushButton("Refresh camera")
         self.btnRefreshCamera.setMinimumHeight(50)
@@ -58,7 +52,6 @@ class ControlPanel(QtGui.QFrame):
 
         # Place all buttons and labels on the panel
         panelLayout.addWidget(self.btnLoadTray)
-        panelLayout.addWidget(self.btnStartScanning)
         panelLayout.addWidget(self.btnRefreshCamera)
         panelLayout.addWidget(self.btnExport)
         panelLayout.addWidget(self.btnQuit)
@@ -69,7 +62,6 @@ class ControlPanel(QtGui.QFrame):
 
         # Connect slots for the buttion actions
         self.btnLoadTray.clicked.connect(self.selectTrayImage)
-        self.btnStartScanning.clicked.connect(self.data.toggleScanningMode)
         self.btnExport.clicked.connect(self.data.exportToCSV)
         self.btnQuit.clicked.connect(QtCore.QCoreApplication.instance().quit)
         self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
@@ -88,14 +80,6 @@ class ControlPanel(QtGui.QFrame):
             csvfile[1] = "csv"
             csvfile = '.'.join(csvfile)
             self.sigLoadTrayImage.emit(fname, csvfile)
-
-    def scanningModeToggled(self, newphase):
-        if newphase == AppData.EDIT_MODE:
-            self.btnStartScanning.setText("Start Barcode Scanning")
-            self.btnRefreshCamera.setEnabled(False)
-        elif newphase == AppData.SCANNING_MODE:
-            self.btnStartScanning.setText("Stop Barcode Scanning")
-            self.btnRefreshCamera.setEnabled(True)
 
     def setCurrentBugId(self, string):
         self.txtBarcode.setText(string)
