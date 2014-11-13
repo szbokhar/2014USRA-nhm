@@ -249,7 +249,16 @@ class BugBox:
     def __str__(self):
         return "BugBox('" + self.name +\
             "', static=" + str(self.static) +\
-            ", live=" + str(self.live) + ")"
+            ", live=" + str(self.live) +\
+            ", point=" + str(self.point) + ")"
 
     def __repr__(self):
         return str(self)
+
+    def getStaticBox(self, scale=1):
+        (x1, y1, x2, y2) = self.static
+        return (int(x1*scale), int(y1*scale), int(x2*scale), int(y2*scale))
+
+    def getPoint(self, scale=1):
+        (x1, y1) = self.point
+        return (int(x1*scale), int(y1*scale))

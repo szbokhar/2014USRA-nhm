@@ -1,5 +1,6 @@
 from PySide import QtCore, QtGui
 import cv2
+import csv
 import numpy as np
 import os.path
 import sys
@@ -73,6 +74,7 @@ class AppData:
         self.placedBoxes = []
         self.stableBoxRun = 0
         self.stableBox = None
+        self.rescalePlacedboxes = False
 
         # Variables used for editing the boxes
         self.selectedEditBox = None
@@ -87,6 +89,7 @@ class AppData:
         self.midpanCursor = QtGui.QCursor(QtCore.Qt.ClosedHandCursor)
         self.selectCursor = QtGui.QCursor(QtCore.Qt.CrossCursor)
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+
 
     def setGuiElements(self, control, big, small):
         """Associate the elements of the gui with the application data.
@@ -110,15 +113,26 @@ class AppData:
         self.cameraLabel = self.lblBig
         self.staticLabel = self.lblSmall
 
-    def setTrayScan(self, fname):
+    def setTrayScan(self, image_fname, csv_fname):
         """Load the tray scan image and activate the camera.
 
         Keyword Arguments:
-        fname -- the string filepath of the tray scan image"""
+        image_fname -- the string filepath of the tray scan image"""
 
         # Load the image
-        self.trayPath = fname
+        self.trayPath = image_fname
         self.trayImage = cv2.imread(self.trayPath, cv2.IMREAD_COLOR)
+
+        # Load csv file
+        if os.path.isfile(csv_fname):
+            with open(csv_fname) as csvfile:
+                reader = csv.reader(csvfile)
+                self.placedBoxes = []
+                for b in reader:
+                    box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]), int(b[4])), (int(b[5]), int(b[6])))
+                    self.placedBoxes.append(box)
+
+                self.rescalePlacedBoxes = True
 
         # Downscale the image
         height = self.trayImage.shape[0]
@@ -236,8 +250,16 @@ class AppData:
         """
 
         for i in range(len(self.placedBoxes)):
+            if self.rescalePlacedBoxes == True:
+                s = self.trayImageScale
+                (x, y) = self.placedBoxes[i].point
+                self.placedBoxes[i].point = (int(x*s), int(y*s))
+                (x1, y1, x2, y2) = self.placedBoxes[i].static
+                self.placedBoxes[i].static =\
+                    (int(x1*s), int(y1*s), int(x2*s), int(y2*s))
+
             b = self.placedBoxes[i].static
-            p = self.placedBoxes[i].point
+            (px, py) = self.placedBoxes[i].point
             a = AppData.DRAW_DELTA*2
             col = None
             if i == self.removedBug:
@@ -248,9 +270,11 @@ class AppData:
             else:
                 col = regular
 
-            cv2.line(image, (p.x-a, p.y-a), (p.x+a, p.y+a), col, 2)
-            cv2.line(image, (p.x+a, p.y-a), (p.x-a, p.y+a), col, 2)
-            cv2.circle(image, p.t(), int(math.sqrt(2)*a), col, 2)
+            cv2.line(image, (px-a, py-a), (px+a, py+a), col, 2)
+            cv2.line(image, (px+a, py-a), (px-a, py+a), col, 2)
+            cv2.circle(image, (px, py), int(math.sqrt(2)*a), col, 2)
+
+        self.rescalePlacedBoxes = False
 
     def findCorrectBox(self, live_pt, live_frame, static_frame):
         """Finds the correct place to create a box once an insect has been
@@ -298,7 +322,7 @@ class AppData:
                                            int(a*x4+(1-a)*x2),
                                            int(a*y4+(1-a)*y2)),
                                           live_box,
-                                          static_pt)
+                                          static_pt.t())
                     else:
                         # If the new box is too different, the reset the stable
                         # counter and the stable box
@@ -520,11 +544,12 @@ class AppData:
     def exportToCSV(self):
         """Called when the Export to CSV button is pressed"""
         fname, _ = QtGui.QFileDialog.getSaveFileName()
-        print(fname)
 
         f = open(fname, 'w')
         for b in self.placedBoxes:
-            f.write(b.name + ", " + str(b.static) + '\n')
+            f.write(b.name + ", " +
+                str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +
+                str(b.getPoint(1/self.trayImageScale))[1:-1] + '\n')
 
     def bigLabelMousePress(self, ev, scale):
         """When the mouse is clicked on the big label.
@@ -667,8 +692,8 @@ class AppData:
                 b = self.placedBoxes[self.selectedEditBox]
                 (x1, y1, x2, y2) = b.static
                 newBox = b.static
-                (px, py) = b.point.t()
-                newPoint = b.point.t()
+                (px, py) = b.point
+                newPoint = b.point
                 if self.editAction == AppData.DG_NW:
                     newBox = (x1+dx, y1+dy, x2, y2)
                     self.staticLabel.setCursor(self.resizeCursorF)
@@ -699,7 +724,7 @@ class AppData:
                     self.staticLabel.setCursor(self.midpanCursor)
 
                 b.static = newBox
-                b.point = Pt(newPoint[0], newPoint[1])
+                b.point = newPoint
 
         self.bigMLastPos = self.bigMPos
 

@@ -9,7 +9,7 @@ class ControlPanel(QtGui.QFrame):
     """A QtWidget that holds all the control buttons for the application."""
 
     # Signals emmited by the control panel
-    sigLoadTrayImage = QtCore.Signal(str)
+    sigLoadTrayImage = QtCore.Signal(str, str)
 
     def __init__(self, data, parent=None):
         super(ControlPanel, self).__init__(parent)
@@ -84,7 +84,10 @@ class ControlPanel(QtGui.QFrame):
         if fname != "":
             fpath = fname.split("/")
             self.currentPath = "/".join(fpath[0:-1])
-            self.sigLoadTrayImage.emit(fname)
+            csvfile = fpath[-1].split('.')
+            csvfile[1] = "csv"
+            csvfile = '.'.join(csvfile)
+            self.sigLoadTrayImage.emit(fname, csvfile)
 
     def scanningModeToggled(self, newphase):
         if newphase == AppData.EDIT_MODE:

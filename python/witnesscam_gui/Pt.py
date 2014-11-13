@@ -18,7 +18,7 @@ class Pt:
 
     def __str__(self):
         pp('str')
-        return 'Pt(' + str(self.x) + ", " + str(self.x) + ")"
+        return 'Pt(' + str(self.x) + ", " + str(self.y) + ")"
 
     def __repr__(self):
         pp('repr')
