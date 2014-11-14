@@ -135,8 +135,10 @@ def findWeightedMedianPoint2D(image, roi):
     totalIntensity = 0.0
     xlist = []
     ylist = []
-    for x in range(roi[0].x, roi[1].x, 5):
-        for y in range(roi[0].y, roi[1].y, 5):
+    area = (roi[1].x - roi[0].x)*(roi[1].y-roi[0].y)
+    step = int(math.sqrt(area)/50)
+    for x in range(roi[0].x, roi[1].x, step):
+        for y in range(roi[0].y, roi[1].y, step):
             if image[y, x] > 0:
                 totalIntensity += image[y, x]
                 xlist.append((x, image[y, x]))

@@ -26,9 +26,8 @@ class AppData:
         range(10)
 
     # Number of stable frames to wait before performing certain actions
-    ACTION_DELAY = 25
-
     DRAW_DELTA = 10
+    ACTION_DELAY = 25
     BOX_ERROR_TOLERANCE = 0.1
     BOX_BLENDING_FACTOR = 0.9
     GRAY_THRESHOLD = 20
@@ -43,9 +42,29 @@ class AppData:
         # Labels for displaying images
         self.cameraLabel = None
         self.staticLabel = None
+        self.controlPanel = None
+        self.lblBig = None
+        self.lblSmall = None
 
         # Whether the camera has been turned on yet
         self.camOn = False
+
+        # Mouse cursors used when editing boxes
+        self.resizeCursorH = QtGui.QCursor(QtCore.Qt.SizeHorCursor)
+        self.resizeCursorV = QtGui.QCursor(QtCore.Qt.SizeVerCursor)
+        self.resizeCursorB = QtGui.QCursor(QtCore.Qt.SizeBDiagCursor)
+        self.resizeCursorF = QtGui.QCursor(QtCore.Qt.SizeFDiagCursor)
+        self.prepanCursor = QtGui.QCursor(QtCore.Qt.OpenHandCursor)
+        self.midpanCursor = QtGui.QCursor(QtCore.Qt.ClosedHandCursor)
+        self.selectCursor = QtGui.QCursor(QtCore.Qt.CrossCursor)
+        self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+
+        self.reset()
+
+    def reset(self):
+        # Set labes
+        self.cameraLabel = self.lblBig
+        self.staticLabel = self.lblSmall
 
         # Mouse position (current and last) on the big label
         self.bigMPos = (0, 0)
@@ -68,6 +87,7 @@ class AppData:
         self.lastStableAverage = 0
         self.removedBug = -1
         self.frameCount = 0
+        self.lastMedpos = None
 
         # Variables used in keeping track of the placed boxes
         self.currentSelectionBox = None
@@ -79,17 +99,6 @@ class AppData:
         # Variables used for editing the boxes
         self.selectedEditBox = None
         self.editAction = AppData.NO_ACTION
-
-        # Mouse cursors used when editing boxes
-        self.resizeCursorH = QtGui.QCursor(QtCore.Qt.SizeHorCursor)
-        self.resizeCursorV = QtGui.QCursor(QtCore.Qt.SizeVerCursor)
-        self.resizeCursorB = QtGui.QCursor(QtCore.Qt.SizeBDiagCursor)
-        self.resizeCursorF = QtGui.QCursor(QtCore.Qt.SizeFDiagCursor)
-        self.prepanCursor = QtGui.QCursor(QtCore.Qt.OpenHandCursor)
-        self.midpanCursor = QtGui.QCursor(QtCore.Qt.ClosedHandCursor)
-        self.selectCursor = QtGui.QCursor(QtCore.Qt.CrossCursor)
-        self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
-
 
     def setGuiElements(self, control, big, small):
         """Associate the elements of the gui with the application data.
@@ -129,7 +138,8 @@ class AppData:
                 reader = csv.reader(csvfile)
                 self.placedBoxes = []
                 for b in reader:
-                    box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]), int(b[4])), (int(b[5]), int(b[6])))
+                    box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]),
+                                 int(b[4])), (int(b[5]), int(b[6])))
                     self.placedBoxes.append(box)
 
                 self.rescalePlacedBoxes = True
@@ -141,6 +151,9 @@ class AppData:
 
         # Display the image
         self.staticLabel.setImage(self.trayImage)
+
+        # Clear data
+        self.reset()
 
         # Start the camera loop
         self.startCameraFeed()
@@ -244,7 +257,7 @@ class AppData:
         """
 
         for i in range(len(self.placedBoxes)):
-            if self.rescalePlacedBoxes == True:
+            if self.rescalePlacedBoxes:
                 s = self.trayImageScale
                 (x, y) = self.placedBoxes[i].point
                 self.placedBoxes[i].point = (int(x*s), int(y*s))
@@ -413,7 +426,7 @@ class AppData:
         the corners of the insect tray in the camera view."""
 
         # Save the current view of the camera
-        self.camBackground = np.copy(self.cameraImage)
+        self.refreshCamera()
 
         # Change phase to scanning mode
         self.phase = AppData.SCANNING_MODE
@@ -475,6 +488,7 @@ class AppData:
 
         # Convert color image for current frame to grayscale image difference
         # and apply the mask to block off certain areas
+        frame = cv2.cvtColor(frame, cv2.cv.CV_BGR2Lab)
         frame = np.absolute(np.subtract(self.camBackground.astype(int),
                             frame.astype(int))).astype(np.uint8)
         frame = np.add.reduce(np.square(np.multiply(
@@ -516,6 +530,14 @@ class AppData:
                 medpos = findWeightedMedianPoint2D(
                     tframe, self.trayBoundingBox)
 
+                if self.lastMedpos is not None and medpos is not None:
+                    (x0, y0) = self.lastMedpos.t()
+                    (x, y) = medpos.t()
+                    if (x0-x) != 0 or (y0-y) != 0:
+                        self.stableRun = 0
+                        self.stableBoxRun = 0
+                        self.stableBox = None
+
             # Overall frame count
             if self.removedBug != -1:
                 self.frameCount += 1
@@ -524,6 +546,7 @@ class AppData:
             self.activeFrameLastDiff = np.sum(tframe)/polyArea
             self.activeFrameSmoothDelta = 0
 
+        self.lastMedpos = medpos
         frame = np.uint8(frame)
         return (frame, medpos)
 
@@ -531,6 +554,8 @@ class AppData:
         """Save the current camera view as the background, and reset some
         counters"""
         self.camBackground = np.copy(self.cameraImage)
+        self.camBackground = cv2.cvtColor(self.camBackground,
+                                          cv2.cv.CV_BGR2Lab)
         self.stableRun = 0
 
     def refreshCameraButton(self):
@@ -545,8 +570,8 @@ class AppData:
         f = open(fname, 'w')
         for b in self.placedBoxes:
             f.write(b.name + ", " +
-                str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +
-                str(b.getPoint(1/self.trayImageScale))[1:-1] + '\n')
+                    str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +
+                    str(b.getPoint(1/self.trayImageScale))[1:-1] + '\n')
 
     def bigLabelMousePress(self, ev, scale):
         """When the mouse is clicked on the big label.
@@ -648,6 +673,7 @@ class AppData:
                 self.selectedEditBox = i
                 self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
                 self.setCurrentSelectionBox(-1)
+                self.refreshCamera()
 
         # Check for deselect of box
         if not clickedOn:

@@ -38,6 +38,6 @@ class MainWindow(QtGui.QMainWindow):
         # Finish up window
         self.statusBar().showMessage("Ready")
         self.setGeometry(0, 0, 1024, 720)
-        self.setFixedSize(self.size())
+        # self.setFixedSize(self.size())
         self.setWindowTitle('Insect Segmentation')
         self.show()
