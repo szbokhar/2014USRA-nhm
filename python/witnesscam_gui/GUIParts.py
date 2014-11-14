@@ -49,6 +49,8 @@ class ControlPanel(QtGui.QFrame):
         # Create the Barcode label
         self.txtBarcode = QtGui.QLineEdit()
         self.txtBarcode.setText('')
+        self.txtBarcode.setMinimumWidth(100)
+        self.txtBarcode.setEnabled(False)
 
         # Place all buttons and labels on the panel
         panelLayout.addWidget(self.btnLoadTray)
@@ -90,7 +92,8 @@ class BigLabel(QtGui.QLabel):
     """The large sized label with convienence function for displaying images
     in numpy arrays, as well as signals for mouse events"""
 
-    labelSize = (640, 480)
+    originalSize = (640, 480)
+    resizeScale = (1.0, 1.0)
 
     sigMousePress = QtCore.Signal(QtGui.QMouseEvent, float)
     sigMouseMove = QtCore.Signal(QtGui.QMouseEvent, float)
@@ -104,13 +107,12 @@ class BigLabel(QtGui.QLabel):
         self.imageScaleRatio = 1
 
     def initUI(self):
-        self.setFixedSize(QtCore.QSize(self.labelSize[0], self.labelSize[1]))
         self.setAlignment(QtCore.Qt.AlignTop)
 
     def setImage(self, cvImage):
         cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2RGB)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
-        (w, h, rat) = computeImageScaleFactor(originalSize, self.labelSize)
+        (w, h, rat) = computeImageScaleFactor(originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
         cvImage = cv2.resize(cvImage, (w, h))
         img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
@@ -127,12 +129,24 @@ class BigLabel(QtGui.QLabel):
     def mouseReleaseEvent(self, ev):
         self.sigMouseRelease.emit(ev)
 
+    def newResizeScale(self, scale):
+        self.resizeScale = scale
+        (sx, sy) = scale
+        (w, h) = self.originalSize
+        self.resize(int(w*sx), int(h*sy))
+
+    def getCurrentSize(self):
+        (sx, sy) = self.resizeScale
+        (w, h) = self.originalSize
+        return (w*sx, h*sy)
+
 
 class SmallLabel(QtGui.QLabel):
     """The small sized label with convienence function for displaying images
     in numpy arrays"""
 
-    labelSize = (300, 200)
+    originalSize = (300, 200)
+    resizeScale = (1.0, 1.0)
 
     def __init__(self, data, parent=None):
         super(SmallLabel, self).__init__(parent)
@@ -141,7 +155,6 @@ class SmallLabel(QtGui.QLabel):
         self.imageScaleRatio = 1
 
     def initUI(self):
-        self.setFixedSize(QtCore.QSize(self.labelSize[0], self.labelSize[1]))
         self.setAlignment(QtCore.Qt.AlignTop)
 
     def setImage(self, cvImage):
@@ -150,10 +163,21 @@ class SmallLabel(QtGui.QLabel):
         else:
             cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2RGB)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
-        (w, h, rat) = computeImageScaleFactor(originalSize, self.labelSize)
+        (w, h, rat) = computeImageScaleFactor(originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
         cvImage = cv2.resize(cvImage, (w, h))
         img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
                            cvImage.strides[0], QtGui.QImage.Format_RGB888)
 
         self.setPixmap(QtGui.QPixmap.fromImage(img))
+
+    def newResizeScale(self, scale):
+        self.resizeScale = scale
+        (sx, sy) = scale
+        (w, h) = self.originalSize
+        self.resize(int(w*sx), int(h*sy))
+
+    def getCurrentSize(self):
+        (sx, sy) = self.resizeScale
+        (w, h) = self.originalSize
+        return (w*sx, h*sy)

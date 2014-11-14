@@ -6,9 +6,12 @@ from GUIParts import *
 
 class MainWindow(QtGui.QMainWindow):
 
+    originalSize = (1024, 600)
+
     def __init__(self, fname=None):
         super(MainWindow, self).__init__()
         self.initUI(fname)
+
 
     def initUI(self, fname=None):
         # Setup main content area
@@ -19,8 +22,8 @@ class MainWindow(QtGui.QMainWindow):
         self.data = AppData()
         self.controlPanel = ControlPanel(self.data)
         self.lblBig = BigLabel(self.data)
-        self.lblsmall = SmallLabel(self.data)
-        self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblsmall)
+        self.lblSmall = SmallLabel(self.data)
+        self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
 
         self.topPanel = QtGui.QFrame()
         self.topContent = QtGui.QHBoxLayout(self)
@@ -33,11 +36,20 @@ class MainWindow(QtGui.QMainWindow):
         mainContent.addWidget(self.topPanel)
         mainContent.addWidget(self.controlPanel)
         self.topContent.addWidget(self.lblBig)
-        self.topContent.addWidget(self.lblsmall)
+        self.topContent.addWidget(self.lblSmall)
 
         # Finish up window
         self.statusBar().showMessage("Ready")
-        self.setGeometry(0, 0, 1024, 720)
-        # self.setFixedSize(self.size())
+        self.setGeometry(0, 0, self.originalSize[0], self.originalSize[1])
         self.setWindowTitle('Insect Segmentation')
         self.show()
+
+    def resizeEvent(self, ev):
+        h = ev.size().height()
+        w = ev.size().width()
+        (oldW, oldH) = self.originalSize
+        scale = (float(w)/oldW, float(h)/oldH)
+        self.lblBig.newResizeScale(scale)
+        self.lblSmall.newResizeScale(scale)
+
+

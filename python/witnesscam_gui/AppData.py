@@ -449,6 +449,7 @@ class AppData:
         self.polygon_model = buildPolygonSquareModel(self.polyPoints)
 
         self.controlPanel.btnRefreshCamera.setEnabled(True)
+        self.controlPanel.txtBarcode.setEnabled(True)
 
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
