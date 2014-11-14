@@ -2,21 +2,21 @@ Insect Digitization Witness Cam App
 ===================================
 
 This application hopes to make the process of attaching a barcode to pinned
-insect specemines and associating them with a digital image as easy as
-possible. This readme will describe how to use the application, and some
-configuration options. I have only tested this on Mac OS 10.9, with packages
-installed with MacPorts, but it should also work on Ubuntu or other Linux
-distributions.
+insect specimens and associating them with a digital image as easy as possible.
+This README will describe how to use the application, and some configuration
+options. I have only tested this on Mac OS 10.9, with packages installed with
+MacPorts, but it should also work on Ubuntu or other Linux distributions.
 
 Setup Instructions
 ------------------
 This application runs with python 2.7, and requires numpy, pyside, and OpenCV
-for Python. The reason we use python2.7 is because opencv does not currently
-    support Python3.
+for Python. The reason we use python2.7 is because OpenCV does not currently
+support Python3.
 
 - Python: [https://www.python.org/](https://www.python.org/)
 - Numpy: [http://www.numpy.org/](http://www.numpy.org/)
-- PySide: [http://qt-project.org/wiki/PySideDocumentation](http://qt-project.org/wiki/PySideDocumentation)
+- PySide: [http://qt-project.org/wiki/PySideDocumentation](
+  http://qt-project.org/wiki/PySideDocumentation)
 - OpenCV: [http://www.scipy.org/](http://www.scipy.org/)
 
 
@@ -27,7 +27,7 @@ $ sudo port install opencv +python27
 ```
 - MacPorts (for OSX): [https://www.macports.org/](https://www.macports.org/)
 
-On most linux distros, these packages should be availabe through the package
+On most linux distros, these packages should be available through the package
 manager, though the commands and package names will differ.
 
 
@@ -48,8 +48,8 @@ camera.
 The camera view will be displayed in the big box. Position the actual insect
 tray (corresponding to the loaded image) in clear view of the camera. Now click
 on the four corners of the tray in the camera view starting from the top left
-corner of the tray in the scanned image. This is very important. Upon each
-click a small circle will be placed at each corner.
+corner of the tray in the scanned image. This is very important (Include
+image). Upon each click a small circle will be placed at each corner.
 
 Once all four corners are clicked, the scan of the tray will be placed in the
 big box, and the camera view will be moved to the small box, and turn black.
@@ -57,14 +57,14 @@ big box, and the camera view will be moved to the small box, and turn black.
 
 ### Scanning process
 When the tray scan is shown on in the big view, the scanning process has
-started. When you remove an insect from the tray and completly out of view of
+started. When you remove an insect from the tray and completely out of view of
 the camera, the system will determine which insect was removed, and mark it
 with a blue circle and X. This indicates that this is the removed insect. When
-this happens, you can modify the **ID** in the textbox, and the changes will
+this happens, you can modify the **ID** in the text box, and the changes will
 automatically be applied to that insect. 
 
 If the barcode scanner is plugged in and can act as a keyboard device, then
-simply scanning the barcode will be enough. The **ID** textbox should
+simply scanning the barcode will be enough. The **ID** text box should
 automatically focus every time a bug is removed.
 
 Once the barcode has been entered, attach the barcode to the pin, and replace
@@ -79,7 +79,7 @@ to edit the markers that were placed down.
 
 First make sure all the insects are back at their places on the tray. Then you
 can click on any of the markers. When selected, they will turn red, and a box
-will be placed approximatly around the insect.
+will be placed approximately around the insect.
 
 The following editing options are supported:
 
@@ -87,26 +87,28 @@ The following editing options are supported:
   box
 - **Resize**: The box can be resized by dragging the corners or edges of the
   box
-- **Delete**: The box and marker can be deleted by right clickng on the
+- **Delete**: The box and marker can be deleted by right clicking on the
   selected marker
 - **Change ID**: The ID of the selected bug/marker is displayed in the **ID**
   text box. Changing the contained text will change the ID associated with that
   marker
 
 
-### Fixing witnesscam errors
-Sometimes the witnesscam will misrecognize something, or some other error may
-occurr. This can usually be fixed by deleting the misplaced marker (see
-previous section).
+### Fixing witness-cam errors
+Sometimes the witness-cam will mis-recognize something, or some other error may
+occur. This can usually be fixed by deleting the misplaced marker (see previous
+section).
 
 Another option to fix recognition errors is to make sure all bugs are back on
 the tray, and make sure nothing is obscuring the view of the tray. Then click
 the **Refresh Camera** button. This will recalibrate the background, and
 hopefully fix any errors.
 
-### Exporting the scanning data The data from the scanning process can be
-exported at any time. By clicking the **Export CSV**, a csv (comma separated
-value) file can be written. It could look something like this:
+### Exporting the scanning data
+The data from the scanning process can be exported at any time. By clicking the
+**Export CSV**, a csv (comma separated value) file can be written. It could
+look something like this:
+
 ```
 BB 10011, 195, 397, 445, 975, 323, 681
 BB 10021, 225, 1067, 447, 1545, 325, 1297
@@ -131,8 +133,8 @@ you can continue the work.
 
 Implementation Configuration
 ----------------------------
-This should only be done if the application is routinly underperforming, such
-as misrecognizing operators hand's for removed bugs, or if the camera is
+This should only be done if the application is routinely under performing, such
+as mis-recognizing operators hand's for removed bugs, or if the camera is
 particularly noisy and a bug is never recognized as being removed.
 
 In **AppData.py** starting at line 30, there are several constants used in the
@@ -168,8 +170,8 @@ vision process. These control aspects such as error tolerance and waiting time.
 - **STABLE_FRAME_DELTA_THRESHOLD**: (float greater than 0) If the current frame
   delta value is less than STABLE_FRAME_DELTA_THRESHOLD for ACTION_DELAY
   frames, then the view in the camera is considered to have not changed, and it
-  is safe to refresh the camera, or take an action. Generall no actions are
+  is safe to refresh the camera, or take an action. Generally no actions are
   taken while the camera view is changing.
 - **STABLE_FRAME_ACTION_THRESHOLD**: (float greater than 0) If the total
-  difference in the frame is less than STABLE_FRAME_ACTION_THRESHOLD, then dont
-  take any action. That small difference is just considered to be noise.
+  difference in the frame is less than STABLE_FRAME_ACTION_THRESHOLD, then
+  don't take any action. That small difference is just considered to be noise.
