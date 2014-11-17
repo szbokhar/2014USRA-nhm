@@ -213,7 +213,7 @@ def getOverlappingBox(boxes, box, threshold=0.5):
             c = min(x2, u2)
             d = min(y2, v2)
             overlap_area = abs(a-c)*abs(b-d)
-            total_area = (u2-u1)*(v2-v1)
+            total_area = (x2-x1)*(y2-y1)
             perc = overlap_area/float(total_area)
 
             # Only consider overlapping if more than 50% of the test box

@@ -27,6 +27,9 @@ class AppData:
 
     # Number of stable frames to wait before performing certain actions
     DRAW_DELTA = 10
+    CAM_MAX_WIDTH = 640
+    CAM_MAX_HEIGHT = 480
+
     ACTION_DELAY = 25
     BOX_ERROR_TOLERANCE = 0.1
     BOX_BLENDING_FACTOR = 0.9
@@ -146,7 +149,7 @@ class AppData:
 
         # Downscale the image
         height = self.trayImage.shape[0]
-        self.trayImage = cv2.pyrDown(self.trayImage)
+        # self.trayImage = cv2.pyrDown(self.trayImage)
         self.trayImageScale = float(self.trayImage.shape[0])/height
 
         # Display the image
@@ -176,9 +179,10 @@ class AppData:
         to on screen."""
 
         # Get new camera frame and reload fresh static frame
-        _, cameraImage = self.capture.read()
-        self.cameraImage = cv2.pyrDown(cameraImage)
-        self.cameraImage = cv2.pyrDown(self.cameraImage)
+        _, self.cameraImage = self.capture.read()
+        while (self.cameraImage.shape[0] > AppData.CAM_MAX_HEIGHT or
+               self.cameraImage.shape[1] > AppData.CAM_MAX_WIDTH):
+            self.cameraImage = cv2.pyrDown(self.cameraImage)
 
         # Process and modify the camera and static frames
         (cameraFrame, staticFrame) = self.amendFrame(self.cameraImage,
@@ -210,16 +214,17 @@ class AppData:
         static_frame = np.copy(static_frame)
 
         (mx, my) = self.bigMPos
-        d = AppData.DRAW_DELTA
+        dC = int(AppData.DRAW_DELTA/self.cameraLabel.imageScaleRatio)
+        dS = int(AppData.DRAW_DELTA/self.staticLabel.imageScaleRatio)
 
         if self.phase == AppData.SELECT_POLYGON:
             # Draw the cursor on the image
-            cv2.line(camera_frame, (mx-d, my), (mx+d, my), BLUE, 1)
-            cv2.line(camera_frame, (mx, my-d), (mx, my+d), BLUE, 1)
+            cv2.line(camera_frame, (mx-dC, my), (mx+dC, my), BLUE, max(int(dC/5), 1))
+            cv2.line(camera_frame, (mx, my-dC), (mx, my+dC), BLUE, max(int(dC/5), 1))
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
-                cv2.circle(camera_frame, (p.x, p.y), 5, GREEN)
+                cv2.circle(camera_frame, (p.x, p.y), int(dC*0.6), GREEN)
 
         elif self.phase == AppData.SCANNING_MODE:
 
@@ -234,11 +239,11 @@ class AppData:
                 (trayHeight, trayWidth, _) = self.trayImage.shape
                 (u, v) = poly2square(self.polygon_model, trayWidth, trayHeight,
                                      centroid).t()
-                cv2.line(static_frame, (u-d, v), (u+d, v), RED, 5)
-                cv2.line(static_frame, (u, v-d), (u, v+d), RED, 5)
+                cv2.line(static_frame, (u-dS, v), (u+dS, v), RED, max(int(dS/5), 1))
+                cv2.line(static_frame, (u, v-dS), (u, v+dS), RED, max(int(dS/5), 1))
 
             # Draw all the boxes that have already been placed
-            self.drawPlacedBoxes(static_frame, GREEN, RED, BLUE)
+            self.drawPlacedBoxes(static_frame, GREEN, RED, BLUE, dS)
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= AppData.ACTION_DELAY:
@@ -246,7 +251,7 @@ class AppData:
 
         return (camera_frame, static_frame)
 
-    def drawPlacedBoxes(self, image, regular, selected, active):
+    def drawPlacedBoxes(self, image, regular, selected, active, a):
         """Given an input image, draw all of the generated boxes on the image.
         Optional colour paramaters can also be supplied.
 
@@ -279,11 +284,11 @@ class AppData:
 
             b = self.placedBoxes[i].static
             (px, py) = self.placedBoxes[i].point
-            a = AppData.DRAW_DELTA*2
+            t = max(int(a/5), 1)
             col = None
 
             if i == self.selectedEditBox:
-                cv2.rectangle(image, b[0:2], b[2:4], selected, 2)
+                cv2.rectangle(image, b[0:2], b[2:4], selected, t)
                 col = selected
 
             if i == self.removedBug:
@@ -292,9 +297,9 @@ class AppData:
             if i != self.removedBug and i != self.selectedEditBox:
                 col = regular
 
-            cv2.line(image, (px-a, py-a), (px+a, py+a), col, 2)
-            cv2.line(image, (px+a, py-a), (px-a, py+a), col, 2)
-            cv2.circle(image, (px, py), int(math.sqrt(2)*a), col, 2)
+            cv2.line(image, (px-a, py-a), (px+a, py+a), col, t)
+            cv2.line(image, (px+a, py-a), (px-a, py+a), col, t)
+            cv2.circle(image, (px, py), int(math.sqrt(2)*a), col, t)
 
         self.rescalePlacedBoxes = False
 
@@ -328,8 +333,9 @@ class AppData:
                     # Compare the new box to the stable one
                     (x1, y1, x2, y2) = self.stableBox[0]
                     (x3, y3, x4, y4) = static_box
-                    cv2.rectangle(static_frame, (x1, y1), (x2, y2), CYAN, 2)
-                    cv2.rectangle(static_frame, (x3, y3), (x4, y4), WHITE, 2)
+                    t = max(int(AppData.DRAW_DELTA/self.staticLabel.imageScaleRatio)/5, 1)
+                    cv2.rectangle(static_frame, (x1, y1), (x2, y2), CYAN, t)
+                    cv2.rectangle(static_frame, (x3, y3), (x4, y4), WHITE, t)
                     w = x2-x1
                     h = y2-y1
                     eps = AppData.BOX_ERROR_TOLERANCE
