@@ -53,4 +53,4 @@ class MainWindow(QtGui.QMainWindow):
         self.lblSmall.newResizeScale(scale)
 
     def closeEvent(self, event):
-        self.controlPanel.quit()
+        self.data.quit()

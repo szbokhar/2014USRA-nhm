@@ -798,3 +798,7 @@ class AppData:
             self.currentSelectionBox = None
 
         self.removedBug = i
+
+    def quit(self):
+        self.exportToCSV()
+        QtCore.QCoreApplication.instance().quit()
