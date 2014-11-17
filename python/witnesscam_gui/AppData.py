@@ -49,6 +49,11 @@ class AppData:
         self.lblBig = None
         self.lblSmall = None
 
+        # Filename
+        self.trayPath = None
+        self.trayImage = None
+        self.csvPath = None
+
         # Whether the camera has been turned on yet
         self.camOn = False
 
@@ -131,9 +136,16 @@ class AppData:
         Keyword Arguments:
         image_fname -- the string filepath of the tray scan image"""
 
+        # Export current csv if theer is one
+        self.exportToCSV()
+
+        # Clear data
+        self.reset()
+
         # Load the image
         self.trayPath = image_fname
         self.trayImage = cv2.imread(self.trayPath, cv2.IMREAD_COLOR)
+        self.csvPath = csv_fname
 
         # Load csv file
         if os.path.isfile(csv_fname):
@@ -149,14 +161,10 @@ class AppData:
 
         # Downscale the image
         height = self.trayImage.shape[0]
-        # self.trayImage = cv2.pyrDown(self.trayImage)
         self.trayImageScale = float(self.trayImage.shape[0])/height
 
         # Display the image
         self.staticLabel.setImage(self.trayImage)
-
-        # Clear data
-        self.reset()
 
         # Start the camera loop
         self.startCameraFeed()
@@ -572,9 +580,11 @@ class AppData:
 
     def exportToCSV(self):
         """Called when the Export to CSV button is pressed"""
-        fname, _ = QtGui.QFileDialog.getSaveFileName()
 
-        f = open(fname, 'w')
+        if self.csvPath == None or self.csvPath == "":
+            return
+
+        f = open(self.csvPath, 'w')
         for b in self.placedBoxes:
             f.write(b.name + ", " +
                     str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +

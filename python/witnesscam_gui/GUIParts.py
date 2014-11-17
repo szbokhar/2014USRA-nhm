@@ -65,7 +65,7 @@ class ControlPanel(QtGui.QFrame):
         # Connect slots for the buttion actions
         self.btnLoadTray.clicked.connect(self.selectTrayImage)
         self.btnExport.clicked.connect(self.data.exportToCSV)
-        self.btnQuit.clicked.connect(QtCore.QCoreApplication.instance().quit)
+        self.btnQuit.clicked.connect(self.quit)
         self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
         self.txtBarcode.textEdited.connect(self.data.newBugIdEntered)
 
@@ -81,12 +81,16 @@ class ControlPanel(QtGui.QFrame):
             csvfile = fpath[-1].split('.')
             csvfile[1] = "csv"
             csvfile = '.'.join(csvfile)
+            csvfile = self.currentPath+"/"+csvfile
             self.sigLoadTrayImage.emit(fname, csvfile)
 
     def setCurrentBugId(self, string):
         self.txtBarcode.setText(string)
         self.txtBarcode.selectAll()
 
+    def quit(self):
+        self.data.exportToCSV()
+        QtCore.QCoreApplication.instance().quit()
 
 class BigLabel(QtGui.QLabel):
     """The large sized label with convienence function for displaying images
