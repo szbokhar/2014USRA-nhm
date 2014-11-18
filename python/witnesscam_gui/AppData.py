@@ -65,6 +65,7 @@ class AppData:
         self.prepanCursor = QtGui.QCursor(QtCore.Qt.OpenHandCursor)
         self.midpanCursor = QtGui.QCursor(QtCore.Qt.ClosedHandCursor)
         self.selectCursor = QtGui.QCursor(QtCore.Qt.CrossCursor)
+        self.deleteCursor = QtGui.QCursor(QtCore.Qt.PointingHandCursor)
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
 
         self.reset()
@@ -125,6 +126,7 @@ class AppData:
         self.lblBig.sigMousePress.connect(self.bigLabelMousePress)
         self.lblBig.sigMouseMove.connect(self.bigLabelMouseMove)
         self.lblBig.sigMouseRelease.connect(self.bigLabelMouseRelease)
+        self.lblBig.sigScroll.connect(self.bigLabelScroll)
 
         # Have members to remember which label is showing what
         self.cameraLabel = self.lblBig
@@ -205,7 +207,7 @@ class AppData:
 
         self.bigMPos = (x, y)
 
-    def amendFrame(self, camera_frame, static_frame):
+    def amendFrame(self, camera_frame_orig, static_frame):
         """Takes the raw (resized) camera frame, and the plain tray image and
         modifies it for display to the user, as well as updating the internal
         state of the program.
@@ -218,7 +220,7 @@ class AppData:
         camera_frame -- the processed frame from the camera view
         static_frame -- the amended tray image"""
 
-        camera_frame = np.copy(camera_frame)
+        camera_frame = np.copy(camera_frame_orig)
         static_frame = np.copy(static_frame)
 
         (mx, my) = self.bigMPos
@@ -227,12 +229,12 @@ class AppData:
 
         if self.phase == AppData.SELECT_POLYGON:
             # Draw the cursor on the image
-            cv2.line(camera_frame, (mx-dC, my), (mx+dC, my), BLUE, max(int(dC/5), 1))
-            cv2.line(camera_frame, (mx, my-dC), (mx, my+dC), BLUE, max(int(dC/5), 1))
+            cv2.line(camera_frame_orig, (mx-dC, my), (mx+dC, my), BLUE, max(int(dC/5), 1))
+            cv2.line(camera_frame_orig, (mx, my-dC), (mx, my+dC), BLUE, max(int(dC/5), 1))
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
-                cv2.circle(camera_frame, (p.x, p.y), int(dC*0.6), GREEN)
+                cv2.circle(camera_frame_orig, (p.x, p.y), int(dC*0.6), GREEN)
 
         elif self.phase == AppData.SCANNING_MODE:
 
@@ -257,7 +259,16 @@ class AppData:
             if self.stableRun >= AppData.ACTION_DELAY:
                 self.findCorrectBox(centroid, camera_frame, static_frame)
 
-        return (camera_frame, static_frame)
+            self.drawTrayArea(camera_frame_orig, dC)
+
+        return (camera_frame_orig, static_frame)
+
+    def drawTrayArea(self, image, a):
+        for i in range(len(self.polyPoints)):
+            p1 = self.polyPoints[i].t()
+            p2 = self.polyPoints[(i+1)%len(self.polyPoints)].t()
+            cv2.line(image, p1, p2, BLUE, max(a/5, 1))
+
 
     def drawPlacedBoxes(self, image, regular, selected, active, a):
         """Given an input image, draw all of the generated boxes on the image.
@@ -297,6 +308,11 @@ class AppData:
 
             if i == self.selectedEditBox:
                 cv2.rectangle(image, b[0:2], b[2:4], selected, t)
+                cv2.rectangle(image, (b[2]+a, b[1]-3*a), (b[2]+3*a, b[1]-a), selected, t)
+                cv2.line(image, (b[2]+a, b[1]-3*a), (b[2]+3*a, b[1]-a), selected, t)
+                cv2.line(image, (b[2]+3*a, b[1]-3*a), (b[2]+a, b[1]-a), selected, t)
+                ((_,h),_) = cv2.getTextSize(self.placedBoxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
+                cv2.putText(image, self.placedBoxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
                 col = selected
 
             if i == self.removedBug:
@@ -305,9 +321,9 @@ class AppData:
             if i != self.removedBug and i != self.selectedEditBox:
                 col = regular
 
-            cv2.line(image, (px-a, py-a), (px+a, py+a), col, t)
-            cv2.line(image, (px+a, py-a), (px-a, py+a), col, t)
-            cv2.circle(image, (px, py), int(math.sqrt(2)*a), col, t)
+            cv2.line(image, (px, py-a), (px, py+a), col, t)
+            cv2.line(image, (px+a, py), (px-a, py), col, t)
+            cv2.circle(image, (px, py), a, col, t)
 
         self.rescalePlacedBoxes = False
 
@@ -629,6 +645,14 @@ class AppData:
         if self.phase == AppData.SCANNING_MODE:
             self.editMouseRelease()
 
+    def bigLabelScroll(self, ev):
+        """When the mouse is clicked on the big label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent object"""
+        if self.phase == AppData.SCANNING_MODE:
+            self.editMouseScroll(ev)
+
     def editMousePress(self, ev):
         """Called when the application is in edit mode and the mouse is clicked
         on the big label.
@@ -644,6 +668,7 @@ class AppData:
             # (e. corners for resizing, center for panning)
             p = self.bigMPos
             (x1, y1, x2, y2) = self.placedBoxes[self.selectedEditBox].static
+            a = int(AppData.DRAW_DELTA/self.staticLabel.imageScaleRatio)
             if ev.button() == QtCore.Qt.MouseButton.LeftButton:
                 # Process left click
                 if pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
@@ -664,12 +689,7 @@ class AppData:
                     self.editAction = AppData.DG_E
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.editAction = AppData.PAN
-
-                if self.editAction != AppData.NO_ACTION:
-                    return
-            elif ev.button() == QtCore.Qt.MouseButton.RightButton:
-                # Process right click
-                if pointInBox(p, (x1, y1, x2, y2)):
+                elif pointInBox(p, (x2+a, y1-3*a, x2+3*a, y1-a)):
                     if self.removedBug == self.selectedEditBox:
                         self.setCurrentSelectionBox(-1)
                         self.refreshCamera()
@@ -678,6 +698,7 @@ class AppData:
 
                     self.refreshCamera()
 
+                if self.editAction != AppData.NO_ACTION:
                     return
 
         # If a box is not selected, check for clicking on a box to
@@ -712,6 +733,7 @@ class AppData:
         if self.selectedEditBox is not None:
             if self.editAction == AppData.NO_ACTION:
                 c = 15
+                a = int(AppData.DRAW_DELTA/self.staticLabel.imageScaleRatio)
                 (x1, y1, x2, y2) =\
                     self.placedBoxes[self.selectedEditBox].static
                 if pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
@@ -732,6 +754,8 @@ class AppData:
                     self.staticLabel.setCursor(self.resizeCursorH)
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.staticLabel.setCursor(self.prepanCursor)
+                elif pointInBox(p, (x2+a, y1-3*a, x2+3*a, y1-a)):
+                    self.staticLabel.setCursor(self.deleteCursor)
             else:
                 (dx, dy) = (self.bigMPos[0] - self.bigMLastPos[0],
                             self.bigMPos[1] - self.bigMLastPos[1])
@@ -778,6 +802,22 @@ class AppData:
         """Called when the application is in edit mode and the mouse is released
         on the big label."""
         self.editAction = AppData.NO_ACTION
+
+    def editMouseScroll(self, ev):
+        """Called when the application is in edit mode and the mouse is released
+        on the big label."""
+        d = int(math.copysign(1, ev.delta())*math.sqrt(abs(ev.delta()))/self.staticLabel.imageScaleRatio)
+        if abs(d) < 1:
+            d = d/abs(d)
+
+        if self.selectedEditBox is not None:
+            b = self.placedBoxes[self.selectedEditBox]
+            (x1, y1, x2, y2) = b.static
+            rat = (y2-y1)/float(x2-x1)
+            (x1, y1, x2, y2) = (x1-d, y1-int(d*rat), x2+d ,y2+int(d*rat))
+            (x1, y1, x2, y2) = (min(x1,x2), min(y1,y2), max(x1,x2), max(y1,y2))
+            if abs(x1-x2) > 15 and abs(y1-y2) > 15:
+                b.static = (x1,y1,x2,y2)
 
     def newBugIdEntered(self, bid):
         if self.currentSelectionBox is not None:

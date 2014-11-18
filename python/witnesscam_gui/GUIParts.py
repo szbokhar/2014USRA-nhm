@@ -98,6 +98,7 @@ class BigLabel(QtGui.QLabel):
     sigMousePress = QtCore.Signal(QtGui.QMouseEvent, float)
     sigMouseMove = QtCore.Signal(QtGui.QMouseEvent, float)
     sigMouseRelease = QtCore.Signal(QtGui.QMouseEvent)
+    sigScroll = QtCore.Signal(QtGui.QWheelEvent)
 
     def __init__(self, data, parent=None):
         super(BigLabel, self).__init__(parent)
@@ -128,6 +129,9 @@ class BigLabel(QtGui.QLabel):
 
     def mouseReleaseEvent(self, ev):
         self.sigMouseRelease.emit(ev)
+
+    def wheelEvent(self, ev):
+        self.sigScroll.emit(ev)
 
     def newResizeScale(self, scale):
         self.resizeScale = scale
