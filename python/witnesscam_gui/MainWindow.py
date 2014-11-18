@@ -7,6 +7,7 @@ from GUIParts import *
 class MainWindow(QtGui.QMainWindow):
 
     originalSize = (1024, 600)
+    sigLoadTrayImage = QtCore.Signal(str, str)
 
     def __init__(self, fname=None):
         super(MainWindow, self).__init__()
@@ -19,7 +20,7 @@ class MainWindow(QtGui.QMainWindow):
         mainContent = QtGui.QVBoxLayout(self)
 
         # Setup Gui Elements
-        self.data = AppData()
+        self.data = AppData(self)
         self.controlPanel = ControlPanel(self.data)
         self.lblBig = BigLabel(self.data)
         self.lblSmall = SmallLabel(self.data)
@@ -38,11 +39,37 @@ class MainWindow(QtGui.QMainWindow):
         self.topContent.addWidget(self.lblBig)
         self.topContent.addWidget(self.lblSmall)
 
+        # Setup menu bar
+        self.buildMenubar()
+
         # Finish up window
         self.statusBar().showMessage("Ready")
         self.setGeometry(0, 0, self.originalSize[0], self.originalSize[1])
         self.setWindowTitle('Insect Segmentation')
         self.show()
+        self.raise_()
+
+        self.sigLoadTrayImage.connect(self.data.setTrayScan)
+
+    def buildMenubar(self):
+        menubar = QtGui.QMenuBar()
+
+        fileMenu = QtGui.QMenu(menubar)
+        fileMenu.setTitle('File')
+        fileMenu.addAction('Load Tray Image', self.selectTrayImage)
+        fileMenu.addAction('Export to CSV', self.data.exportToCSV)
+        fileMenu.addAction('Exit', self.data.quit)
+
+        imageMenu = QtGui.QMenu(menubar)
+        imageMenu.setTitle('Image')
+        imageMenu.addAction('Retrace tray area', self.data.resetTrayArea)
+        self.actResyncCamera = imageMenu.addAction('Resync Camera', self.data.refreshCameraButton)
+        self.actResyncCamera.setDisabled(True)
+
+        menubar.addMenu(fileMenu)
+        menubar.addMenu(imageMenu)
+
+        self.setMenuBar(menubar)
 
     def resizeEvent(self, ev):
         h = ev.size().height()
@@ -54,3 +81,16 @@ class MainWindow(QtGui.QMainWindow):
 
     def closeEvent(self, event):
         self.data.quit()
+
+    def selectTrayImage(self):
+        fname, _ = QtGui.QFileDialog.getOpenFileName(
+            self, "Open Specimin File", ".")
+
+        if fname != "":
+            fpath = fname.split("/")
+            self.currentPath = "/".join(fpath[0:-1])
+            csvfile = fpath[-1].split('.')
+            csvfile[1] = "csv"
+            csvfile = '.'.join(csvfile)
+            csvfile = self.currentPath+"/"+csvfile
+            self.sigLoadTrayImage.emit(fname, csvfile)

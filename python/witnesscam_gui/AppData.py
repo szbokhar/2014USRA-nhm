@@ -38,9 +38,11 @@ class AppData:
     STABLE_FRAME_DELTA_THRESHOLD = 0.4
     STABLE_FRAME_ACTION_THRESHOLD = 0.5
 
-    def __init__(self):
+    def __init__(self, win):
         """Initializes a bunch of member variables for use in later
         functions"""
+
+        self.window = win
 
         # Labels for displaying images
         self.cameraLabel = None
@@ -207,7 +209,7 @@ class AppData:
 
         self.bigMPos = (x, y)
 
-    def amendFrame(self, camera_frame_orig, static_frame):
+    def amendFrame(self, camera_frame, static_frame):
         """Takes the raw (resized) camera frame, and the plain tray image and
         modifies it for display to the user, as well as updating the internal
         state of the program.
@@ -220,7 +222,8 @@ class AppData:
         camera_frame -- the processed frame from the camera view
         static_frame -- the amended tray image"""
 
-        camera_frame = np.copy(camera_frame_orig)
+        camera_frame_algo = np.copy(camera_frame)
+        camera_frame_show = np.copy(camera_frame)
         static_frame = np.copy(static_frame)
 
         (mx, my) = self.bigMPos
@@ -229,19 +232,19 @@ class AppData:
 
         if self.phase == AppData.SELECT_POLYGON:
             # Draw the cursor on the image
-            cv2.line(camera_frame_orig, (mx-dC, my), (mx+dC, my), BLUE, max(int(dC/5), 1))
-            cv2.line(camera_frame_orig, (mx, my-dC), (mx, my+dC), BLUE, max(int(dC/5), 1))
+            cv2.line(camera_frame_show, (mx-dC, my), (mx+dC, my), BLUE, max(int(dC/5), 1))
+            cv2.line(camera_frame_show, (mx, my-dC), (mx, my+dC), BLUE, max(int(dC/5), 1))
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
-                cv2.circle(camera_frame_orig, (p.x, p.y), int(dC*0.6), GREEN)
+                cv2.circle(camera_frame_show, (p.x, p.y), int(dC*0.6), GREEN)
 
         elif self.phase == AppData.SCANNING_MODE:
 
             # Check if an insect has been moved from/to the tray, and get its
             # position in the camera frame
-            (camera_frame, centroid) =\
-                self.getFrameDifferenceCentroid(camera_frame)
+            (camera_frame_algo, centroid) =\
+                self.getFrameDifferenceCentroid(camera_frame_algo)
             if centroid is not None:
 
                 # If an insect has been removed, find the corresponding insect
@@ -257,11 +260,11 @@ class AppData:
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= AppData.ACTION_DELAY:
-                self.findCorrectBox(centroid, camera_frame, static_frame)
+                self.findCorrectBox(centroid, camera_frame_algo, static_frame)
 
-            self.drawTrayArea(camera_frame_orig, dC)
+            self.drawTrayArea(camera_frame_show, dC)
 
-        return (camera_frame_orig, static_frame)
+        return (camera_frame_show, static_frame)
 
     def drawTrayArea(self, image, a):
         for i in range(len(self.polyPoints)):
@@ -317,6 +320,8 @@ class AppData:
 
             if i == self.removedBug:
                 col = active
+                ((_,h),_) = cv2.getTextSize(self.placedBoxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
+                cv2.putText(image, self.placedBoxes[i].name, (px-2*a, py+a+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
 
             if i != self.removedBug and i != self.selectedEditBox:
                 col = regular
@@ -479,7 +484,30 @@ class AppData:
         self.polygon_model = buildPolygonSquareModel(self.polyPoints)
 
         self.controlPanel.btnRefreshCamera.setEnabled(True)
+        self.window.actResyncCamera.setEnabled(True)
         self.controlPanel.txtBarcode.setEnabled(True)
+
+    def resetTrayArea(self):
+        self.phase = AppData.SELECT_POLYGON
+
+        tmp = self.cameraLabel
+        self.cameraLabel = self.staticLabel
+        self.staticLabel = tmp
+        self.polyPoints = []
+
+        self.trayBoundingBox = None
+        self.polygonModel = None
+        self.controlPanel.btnRefreshCamera.setEnabled(False)
+        self.window.actResyncCamera.setEnabled(False)
+        self.controlPanel.txtBarcode.setEnabled(False)
+
+        self.setCurrentSelectionBox(-1)
+        for b in self.placedBoxes:
+            b.live = None
+
+        self.rescalePlacedBoxes = True
+
+
 
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved

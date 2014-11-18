@@ -9,7 +9,6 @@ class ControlPanel(QtGui.QFrame):
     """A QtWidget that holds all the control buttons for the application."""
 
     # Signals emmited by the control panel
-    sigLoadTrayImage = QtCore.Signal(str, str)
 
     def __init__(self, data, parent=None):
         super(ControlPanel, self).__init__(parent)
@@ -21,21 +20,11 @@ class ControlPanel(QtGui.QFrame):
         panelLayout = QtGui.QHBoxLayout(self)
         self.setLayout(panelLayout)
 
-        # Create the Load Tray buttion
-        self.btnLoadTray = QtGui.QPushButton("Load Tray Scan")
-        self.btnLoadTray.setMinimumHeight(50)
-        self.btnLoadTray.setStatusTip("Load Tray Scan")
-
         # Create the Refresh Camera buttion
         self.btnRefreshCamera = QtGui.QPushButton("Refresh camera")
         self.btnRefreshCamera.setMinimumHeight(50)
         self.btnRefreshCamera.setStatusTip("Refresh Camera")
         self.btnRefreshCamera.setEnabled(False)
-
-        # Create the Export to CSV buttion
-        self.btnExport = QtGui.QPushButton("Export CSV")
-        self.btnExport.setMinimumHeight(50)
-        self.btnExport.setStatusTip("Export CSV")
 
         # Create the Quit buttion
         self.btnQuit = QtGui.QPushButton("Quit")
@@ -53,9 +42,7 @@ class ControlPanel(QtGui.QFrame):
         self.txtBarcode.setEnabled(False)
 
         # Place all buttons and labels on the panel
-        panelLayout.addWidget(self.btnLoadTray)
         panelLayout.addWidget(self.btnRefreshCamera)
-        panelLayout.addWidget(self.btnExport)
         panelLayout.addWidget(self.btnQuit)
         panelLayout.addStretch(1)
         panelLayout.addWidget(self.lblTextLabel)
@@ -63,26 +50,9 @@ class ControlPanel(QtGui.QFrame):
         panelLayout.addStretch(1)
 
         # Connect slots for the buttion actions
-        self.btnLoadTray.clicked.connect(self.selectTrayImage)
-        self.btnExport.clicked.connect(self.data.exportToCSV)
         self.btnQuit.clicked.connect(self.data.quit)
         self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
         self.txtBarcode.textEdited.connect(self.data.newBugIdEntered)
-
-        self.sigLoadTrayImage.connect(self.data.setTrayScan)
-
-    def selectTrayImage(self):
-        fname, _ = QtGui.QFileDialog.getOpenFileName(
-            self, "Open Specimin File", ".")
-
-        if fname != "":
-            fpath = fname.split("/")
-            self.currentPath = "/".join(fpath[0:-1])
-            csvfile = fpath[-1].split('.')
-            csvfile[1] = "csv"
-            csvfile = '.'.join(csvfile)
-            csvfile = self.currentPath+"/"+csvfile
-            self.sigLoadTrayImage.emit(fname, csvfile)
 
     def setCurrentBugId(self, string):
         self.txtBarcode.setText(string)
