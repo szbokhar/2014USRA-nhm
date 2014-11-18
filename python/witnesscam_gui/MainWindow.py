@@ -42,7 +42,11 @@ class MainWindow(QtGui.QMainWindow):
         # Setup menu bar
         self.buildMenubar()
 
+        self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+        self.dragCursor = QtGui.QCursor(QtCore.Qt.DragLinkCursor)
+
         # Finish up window
+        self.setAcceptDrops(True)
         self.statusBar().showMessage("Ready")
         self.setGeometry(0, 0, self.originalSize[0], self.originalSize[1])
         self.setWindowTitle('Insect Segmentation')
@@ -82,9 +86,10 @@ class MainWindow(QtGui.QMainWindow):
     def closeEvent(self, event):
         self.data.quit()
 
-    def selectTrayImage(self):
-        fname, _ = QtGui.QFileDialog.getOpenFileName(
-            self, "Open Specimin File", ".")
+    def selectTrayImage(self, fname=None):
+        if fname is None:
+            fname, _ = QtGui.QFileDialog.getOpenFileName(
+                self, "Open Specimin File", ".")
 
         if fname != "":
             fpath = fname.split("/")
@@ -94,3 +99,17 @@ class MainWindow(QtGui.QMainWindow):
             csvfile = '.'.join(csvfile)
             csvfile = self.currentPath+"/"+csvfile
             self.sigLoadTrayImage.emit(fname, csvfile)
+
+    def dragEnterEvent(self, ev):
+        if ev.mimeData().hasUrls():
+            ev.accept()
+            self.setCursor(self.dragCursor)
+
+    def dragLeaveEvent(self, ev):
+        self.setCursor(self.normalCursor)
+
+    def dropEvent(self, ev):
+        self.setCursor(self.normalCursor)
+
+        if ev.mimeData().hasUrls():
+            self.selectTrayImage(ev.mimeData().urls()[0].path())

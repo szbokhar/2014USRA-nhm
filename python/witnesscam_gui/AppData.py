@@ -153,6 +153,7 @@ class AppData:
 
         # Load csv file
         if os.path.isfile(csv_fname):
+            self.window.statusBar().showMessage('Also loaded CSV file: ' + str(csv_fname.split('/')[-1]))
             with open(csv_fname) as csvfile:
                 reader = csv.reader(csvfile)
                 self.placedBoxes = []
@@ -507,8 +508,6 @@ class AppData:
 
         self.rescalePlacedBoxes = True
 
-
-
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
         background image of the camera, find the point that represents the
@@ -628,11 +627,20 @@ class AppData:
         if self.csvPath == None or self.csvPath == "":
             return
 
-        f = open(self.csvPath, 'w')
-        for b in self.placedBoxes:
-            f.write(b.name + ", " +
-                    str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +
-                    str(b.getPoint(1/self.trayImageScale))[1:-1] + '\n')
+        ret = QtGui.QMessageBox.Yes
+        if os.path.isfile(self.csvPath):
+            ret = QtGui.QMessageBox.question(
+                self.window, 'Overwrite file',
+                'File ' + str(self.csvPath.split('/')[-1]) + ' already exists. Would you like\
+                 to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+
+        if ret == QtGui.QMessageBox.Yes:
+            f = open(self.csvPath, 'w')
+            for b in self.placedBoxes:
+                f.write(b.name + ", " +
+                        str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +
+                        str(b.getPoint(1/self.trayImageScale))[1:-1] + '\n')
+            self.window.statusBar().showMessage('Saved data to ' + str(self.csvPath.split('/')[-1]))
 
     def bigLabelMousePress(self, ev, scale):
         """When the mouse is clicked on the big label.
