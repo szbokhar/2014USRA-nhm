@@ -21,6 +21,22 @@ class AppData:
     # States/Phases the application can be in
     LOAD_FILE, SELECT_POLYGON, SCANNING_MODE = range(3)
 
+    # Hints
+    HINT_LOADFILE = "Load a tray scan image by draggging a file here or using \
+the file menu"
+    HINT_TRAYAREA_1 = "Click on the top right corner of the tray in the scanned \
+image in the live camera view."
+    HINT_TRAYAREA_234 = "Now click on the next corner clockwise"
+    HINT_REMOVEBUG_OR_EDIT = "Remove an insect from the tray and wait for it to be \
+marked with a blue circle, or click a green marker to edit"
+    HINT_REMOVEBUG = "Remove an insect from the tray and wait for it to be \
+marked with a blue circle"
+    HINT_ENTERBARCODE = "Scan the barcode for this insect"
+    HINT_REPLACE_CONTINUE = "Once the barcode is entered correctly, replace the \
+bug and remove the next one"
+    HINT_EDITBOX = "Drag box to move. Scroll to resize. Click X to delete. \
+Click another marker to edit it. Remove insect to continue with scanning"
+
     # Types of editing actions for boxes
     NO_ACTION, DG_NW, DG_N, DG_NE, DG_E, DG_SE, DG_S, DG_SW, DG_W, PAN = \
         range(10)
@@ -97,7 +113,6 @@ class AppData:
         self.stableAverage = 0
         self.lastStableAverage = 0
         self.removedBug = -1
-        self.frameCount = 0
         self.lastMedpos = None
 
         # Variables used in keeping track of the placed boxes
@@ -110,6 +125,8 @@ class AppData:
         # Variables used for editing the boxes
         self.selectedEditBox = None
         self.editAction = AppData.NO_ACTION
+
+        self.setHintText(AppData.HINT_LOADFILE)
 
     def setGuiElements(self, control, big, small):
         """Associate the elements of the gui with the application data.
@@ -134,6 +151,8 @@ class AppData:
         self.cameraLabel = self.lblBig
         self.staticLabel = self.lblSmall
 
+        self.setHintText(AppData.HINT_LOADFILE)
+
     def setTrayScan(self, image_fname, csv_fname):
         """Load the tray scan image and activate the camera.
 
@@ -153,16 +172,23 @@ class AppData:
 
         # Load csv file
         if os.path.isfile(csv_fname):
-            self.window.statusBar().showMessage('Also loaded CSV file: ' + str(csv_fname.split('/')[-1]))
             with open(csv_fname) as csvfile:
                 reader = csv.reader(csvfile)
                 self.placedBoxes = []
-                for b in reader:
-                    box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]),
-                                 int(b[4])), (int(b[5]), int(b[6])))
-                    self.placedBoxes.append(box)
+                if (reader.next()[1] == ' Rectangle x1'):
+                    for b in reader:
+                        box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]),
+                                     int(b[4])), (int(b[5]), int(b[6])))
+                        self.placedBoxes.append(box)
 
-                self.rescalePlacedBoxes = True
+                    self.rescalePlacedBoxes = True
+                    self.window.statusBar().showMessage('Also loaded CSV file: ' + str(csv_fname.split('/')[-1]))
+                else:
+                    QtGui.QMessageBox.information(
+                        self.window, 'Error Reading CSV',
+                        'It seems the file ' + str(csv_fname.split('/')[-1]) +\
+                        ' id badly formatted. Cannot load.')
+
 
         # Downscale the image
         height = self.trayImage.shape[0]
@@ -174,6 +200,8 @@ class AppData:
         # Start the camera loop
         self.startCameraFeed()
         self.phase = AppData.SELECT_POLYGON
+
+        self.setHintText(AppData.HINT_TRAYAREA_1)
 
     def startCameraFeed(self):
         """Begin the camera feed and set up the timer loop."""
@@ -255,6 +283,7 @@ class AppData:
                                      centroid).t()
                 cv2.line(static_frame, (u-dS, v), (u+dS, v), RED, max(int(dS/5), 1))
                 cv2.line(static_frame, (u, v-dS), (u, v+dS), RED, max(int(dS/5), 1))
+
 
             # Draw all the boxes that have already been placed
             self.drawPlacedBoxes(static_frame, GREEN, RED, BLUE, dS)
@@ -406,6 +435,8 @@ class AppData:
                         self.setCurrentSelectionBox(i)
                         self.refreshCamera()
 
+                    self.setHintText(AppData.HINT_ENTERBARCODE)
+
     def floodFillBox(self, p, camera_mask):
         """Given a grayscale image and a point, return a bounding box
         encompassing all the non-zero elements of the image connected to the
@@ -488,6 +519,8 @@ class AppData:
         self.window.actResyncCamera.setEnabled(True)
         self.controlPanel.txtBarcode.setEnabled(True)
 
+        self.setHintText(AppData.HINT_REMOVEBUG_OR_EDIT)
+
     def resetTrayArea(self):
         self.phase = AppData.SELECT_POLYGON
 
@@ -507,6 +540,8 @@ class AppData:
             b.live = None
 
         self.rescalePlacedBoxes = True
+
+        self.setHintText(AppData.HINT_TRAYAREA_1)
 
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
@@ -571,7 +606,7 @@ class AppData:
                 (1-a)*self.activeFrameSmoothDelta + a*delta
             self.activeFrameLastDiff = self.activeFrameCurrentDiff
 
-            # If the cchange in difference from last frame to this one is small
+            # If the change in difference from last frame to this one is small
             # consider it stable and increment the stable counter
             if abs(self.activeFrameSmoothDelta) \
                     < AppData.STABLE_FRAME_DELTA_THRESHOLD:
@@ -595,10 +630,6 @@ class AppData:
                         self.stableRun = 0
                         self.stableBoxRun = 0
                         self.stableBox = None
-
-            # Overall frame count
-            if self.removedBug != -1:
-                self.frameCount += 1
 
         else:
             self.activeFrameLastDiff = np.sum(tframe)/polyArea
@@ -631,11 +662,12 @@ class AppData:
         if os.path.isfile(self.csvPath):
             ret = QtGui.QMessageBox.question(
                 self.window, 'Overwrite file',
-                'File ' + str(self.csvPath.split('/')[-1]) + ' already exists. Would you like\
-                 to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+                'File ' + str(self.csvPath.split('/')[-1]) + ' already exists. Would you like \
+to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
 
         if ret == QtGui.QMessageBox.Yes:
             f = open(self.csvPath, 'w')
+            f.write('Insect Id, Rectangle x1, y1, x2, y1, Point x, y\n')
             for b in self.placedBoxes:
                 f.write(b.name + ", " +
                         str(b.getStaticBox(1/self.trayImageScale))[1:-1] + ', ' +
@@ -653,6 +685,7 @@ class AppData:
             self.polyPoints.append(
                 Pt(int(ev.pos().x()/scale),
                    int(ev.pos().y()/scale)))
+            self.setHintText(AppData.HINT_TRAYAREA_234)
 
             if len(self.polyPoints) == 4:
                 self.gotTrayArea()
@@ -669,6 +702,7 @@ class AppData:
             of the big label"""
         self.setMousepos(int(ev.pos().x()/scale),
                          int(ev.pos().y()/scale))
+        self.staticLabel.setCursor(self.normalCursor)
 
         if self.phase == AppData.SCANNING_MODE:
             self.editMouseMove()
@@ -748,10 +782,12 @@ class AppData:
                 self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
                 self.setCurrentSelectionBox(-1)
                 self.refreshCamera()
+                self.setHintText(AppData.HINT_EDITBOX)
 
         # Check for deselect of box
         if not clickedOn:
             self.selectedEditBox = None
+            self.setHintText(AppData.HINT_REMOVEBUG)
 
     def editMouseMove(self):
         """Called when the application is in edit mode and the mouse is moved
@@ -858,6 +894,7 @@ class AppData:
     def newBugIdEntered(self, bid):
         if self.currentSelectionBox is not None:
             self.currentSelectionBox.name = bid
+            self.setHintText(AppData.HINT_REPLACE_CONTINUE)
         elif self.selectedEditBox != -1:
             self.placedBoxes[self.selectedEditBox].name = bid
 
@@ -870,6 +907,7 @@ class AppData:
             self.currentSelectionBox = self.placedBoxes[i]
             self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
             self.selectedEditBox = None
+            self.setHintText(AppData.HINT_ENTERBARCODE)
         else:
             self.currentSelectionBox = None
 
@@ -878,3 +916,7 @@ class AppData:
     def quit(self):
         self.exportToCSV()
         QtCore.QCoreApplication.instance().quit()
+
+    def setHintText(self, text):
+        if self.controlPanel is not None:
+            self.controlPanel.lblHint.setText(text)

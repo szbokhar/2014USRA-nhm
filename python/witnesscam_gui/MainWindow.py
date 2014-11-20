@@ -6,7 +6,7 @@ from GUIParts import *
 
 class MainWindow(QtGui.QMainWindow):
 
-    originalSize = (1024, 600)
+    originalSize = (800, 600)
     sigLoadTrayImage = QtCore.Signal(str, str)
 
     def __init__(self, fname=None):
@@ -26,18 +26,18 @@ class MainWindow(QtGui.QMainWindow):
         self.lblSmall = SmallLabel(self.data)
         self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
 
-        self.topPanel = QtGui.QFrame()
-        self.topContent = QtGui.QHBoxLayout(self)
+        self.sidePanel = QtGui.QFrame()
+        self.sideContent = QtGui.QHBoxLayout(self)
 
         # Add GUI elements to window
         mainWidget.setLayout(mainContent)
-        self.topPanel.setLayout(self.topContent)
+        self.sidePanel.setLayout(self.sideContent)
         self.setCentralWidget(mainWidget)
 
-        mainContent.addWidget(self.topPanel)
-        mainContent.addWidget(self.controlPanel)
-        self.topContent.addWidget(self.lblBig)
-        self.topContent.addWidget(self.lblSmall)
+        mainContent.addWidget(self.lblBig)
+        mainContent.addWidget(self.sidePanel)
+        self.sideContent.addWidget(self.lblSmall)
+        self.sideContent.addWidget(self.controlPanel)
 
         # Setup menu bar
         self.buildMenubar()

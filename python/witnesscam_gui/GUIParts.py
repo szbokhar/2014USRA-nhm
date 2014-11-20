@@ -17,7 +17,7 @@ class ControlPanel(QtGui.QFrame):
 
     def initUI(self):
         # Setup the panel and layout
-        panelLayout = QtGui.QHBoxLayout(self)
+        panelLayout = QtGui.QVBoxLayout(self)
         self.setLayout(panelLayout)
 
         # Create the Refresh Camera buttion
@@ -25,11 +25,6 @@ class ControlPanel(QtGui.QFrame):
         self.btnRefreshCamera.setMinimumHeight(50)
         self.btnRefreshCamera.setStatusTip("Refresh Camera")
         self.btnRefreshCamera.setEnabled(False)
-
-        # Create the Quit buttion
-        self.btnQuit = QtGui.QPushButton("Quit")
-        self.btnQuit.setMinimumHeight(50)
-        self.btnQuit.setStatusTip("Quit")
 
         # Create the Textbox label
         self.lblTextLabel = QtGui.QLabel()
@@ -41,22 +36,34 @@ class ControlPanel(QtGui.QFrame):
         self.txtBarcode.setMinimumWidth(100)
         self.txtBarcode.setEnabled(False)
 
+        # Create next step label
+        self.lblHint = QtGui.QLabel('Next')
+        self.lblHint.setAlignment(QtCore.Qt.AlignHCenter)
+        # self.lblHint.setFixedWidth(200)
+        self.lblHint.setWordWrap(True)
+
+        # Create frame to hold label and textbox side by side
+        self.pnlBarcode = QtGui.QFrame()
+        barcodePanelLayout = QtGui.QHBoxLayout(self)
+        self.pnlBarcode.setLayout(barcodePanelLayout)
+
         # Place all buttons and labels on the panel
-        panelLayout.addWidget(self.btnRefreshCamera)
-        panelLayout.addWidget(self.btnQuit)
-        panelLayout.addStretch(1)
-        panelLayout.addWidget(self.lblTextLabel)
-        panelLayout.addWidget(self.txtBarcode)
+        barcodePanelLayout.addWidget(self.btnRefreshCamera)
+        barcodePanelLayout.addWidget(self.lblTextLabel)
+        barcodePanelLayout.addWidget(self.txtBarcode)
+        panelLayout.addWidget(self.pnlBarcode)
+        panelLayout.addWidget(self.lblHint)
         panelLayout.addStretch(1)
 
         # Connect slots for the buttion actions
-        self.btnQuit.clicked.connect(self.data.quit)
         self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
         self.txtBarcode.textEdited.connect(self.data.newBugIdEntered)
 
     def setCurrentBugId(self, string):
         self.txtBarcode.setText(string)
         self.txtBarcode.selectAll()
+        self.txtBarcode.setFocus(QtCore.Qt.OtherFocusReason)
+
 
 class BigLabel(QtGui.QLabel):
     """The large sized label with convienence function for displaying images
@@ -76,6 +83,7 @@ class BigLabel(QtGui.QLabel):
         self.initUI()
         self.setMouseTracking(True)
         self.imageScaleRatio = 1
+        self.setPixmap(QtGui.QPixmap(self.originalSize[0], self.originalSize[1]))
 
     def initUI(self):
         self.setAlignment(QtCore.Qt.AlignTop)
@@ -127,6 +135,7 @@ class SmallLabel(QtGui.QLabel):
         self.data = data
         self.initUI()
         self.imageScaleRatio = 1
+        # self.setPixmap(QtGui.QPixmap(self.originalSize[0], self.originalSize[1]))
 
     def initUI(self):
         self.setAlignment(QtCore.Qt.AlignTop)
