@@ -9,18 +9,18 @@ class MainWindow(QtGui.QMainWindow):
     originalSize = (800, 600)
     sigLoadTrayImage = QtCore.Signal(str, str)
 
-    def __init__(self, fname=None):
+    def __init__(self, cv_impl, fname=None):
         super(MainWindow, self).__init__()
-        self.initUI(fname)
+        self.initUI(cv_impl, fname)
 
 
-    def initUI(self, fname=None):
+    def initUI(self, cv_impl, fname=None):
         # Setup main content area
         mainWidget = QtGui.QFrame(self)
         mainContent = QtGui.QVBoxLayout(self)
 
         # Setup Gui Elements
-        self.data = AppData(self)
+        self.data = AppData(self, cv_impl)
         self.controlPanel = ControlPanel(self.data)
         self.lblBig = BigLabel(self.data)
         self.lblSmall = SmallLabel(self.data)

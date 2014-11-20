@@ -54,11 +54,12 @@ Click another marker to edit it. Remove insect to continue with scanning"
     STABLE_FRAME_DELTA_THRESHOLD = 0.4
     STABLE_FRAME_ACTION_THRESHOLD = 0.5
 
-    def __init__(self, win):
+    def __init__(self, win, cv_impl):
         """Initializes a bunch of member variables for use in later
         functions"""
 
         self.window = win
+        self.implementation = cv_impl
 
         # Labels for displaying images
         self.cameraLabel = None

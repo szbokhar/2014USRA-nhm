@@ -1,4 +1,5 @@
 from MainWindow import *
+from WitnessCam import *
 
 
 def main():
@@ -7,7 +8,8 @@ def main():
         logfile = sys.argv[1]
 
     app = QtGui.QApplication(sys.argv)
-    ex = MainWindow(logfile)
+    wc = WitnessCam()
+    ex = MainWindow(wc, logfile)
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
