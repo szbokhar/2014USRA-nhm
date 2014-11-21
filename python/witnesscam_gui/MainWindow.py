@@ -45,6 +45,13 @@ class MainWindow(QtGui.QMainWindow):
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
         self.dragCursor = QtGui.QCursor(QtCore.Qt.DragLinkCursor)
 
+        # Wire up signals and slots
+        self.sigLoadTrayImage.connect(self.data.setTrayScan)
+        cv_impl.sigScanningModeOn.connect(self.controlPanel.btnRefreshCamera.setEnabled)
+        cv_impl.sigScanningModeOn.connect(self.controlPanel.txtBarcode.setEnabled)
+        cv_impl.sigScanningModeOn.connect(self.actResyncCamera.setEnabled)
+        cv_impl.sigRemovedBug.connect(self.data.onBugRemoved)
+
         # Finish up window
         self.setAcceptDrops(True)
         self.statusBar().showMessage("Ready")
@@ -52,8 +59,6 @@ class MainWindow(QtGui.QMainWindow):
         self.setWindowTitle('Insect Segmentation')
         self.show()
         self.raise_()
-
-        self.sigLoadTrayImage.connect(self.data.setTrayScan)
 
     def buildMenubar(self):
         menubar = QtGui.QMenuBar()
@@ -66,7 +71,8 @@ class MainWindow(QtGui.QMainWindow):
 
         imageMenu = QtGui.QMenu(menubar)
         imageMenu.setTitle('Image')
-        imageMenu.addAction('Retrace tray area', self.data.resetTrayArea)
+        imageMenu.addAction('Retrace tray area',
+            self.data.implementation.resetTrayArea)
         self.actResyncCamera = imageMenu.addAction('Resync Camera', self.data.refreshCameraButton)
         self.actResyncCamera.setDisabled(True)
 

@@ -74,8 +74,8 @@ class BigLabel(QtGui.QLabel):
 
     sigMousePress = QtCore.Signal(QtGui.QMouseEvent, float)
     sigMouseMove = QtCore.Signal(QtGui.QMouseEvent, float)
-    sigMouseRelease = QtCore.Signal(QtGui.QMouseEvent)
-    sigScroll = QtCore.Signal(QtGui.QWheelEvent)
+    sigMouseRelease = QtCore.Signal(QtGui.QMouseEvent, float)
+    sigScroll = QtCore.Signal(QtGui.QWheelEvent, float)
 
     def __init__(self, data, parent=None):
         super(BigLabel, self).__init__(parent)
@@ -89,7 +89,10 @@ class BigLabel(QtGui.QLabel):
         self.setAlignment(QtCore.Qt.AlignTop)
 
     def setImage(self, cvImage):
-        cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2RGB)
+        if cvImage.ndim == 2:
+            cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_GRAY2RGB)
+        else:
+            cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2RGB)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
         (w, h, rat) = computeImageScaleFactor(originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
@@ -106,10 +109,10 @@ class BigLabel(QtGui.QLabel):
         self.sigMouseMove.emit(ev, self.imageScaleRatio)
 
     def mouseReleaseEvent(self, ev):
-        self.sigMouseRelease.emit(ev)
+        self.sigMouseRelease.emit(ev, self.imageScaleRatio)
 
     def wheelEvent(self, ev):
-        self.sigScroll.emit(ev)
+        self.sigScroll.emit(ev, self.imageScaleRatio)
 
     def newResizeScale(self, scale):
         self.resizeScale = scale
