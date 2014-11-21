@@ -40,7 +40,7 @@ class MainWindow(QtGui.QMainWindow):
         self.sideContent.addWidget(self.controlPanel)
 
         # Setup menu bar
-        self.buildMenubar()
+        self.buildMenubar(cv_impl)
 
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
         self.dragCursor = QtGui.QCursor(QtCore.Qt.DragLinkCursor)
@@ -51,6 +51,10 @@ class MainWindow(QtGui.QMainWindow):
         cv_impl.sigScanningModeOn.connect(self.controlPanel.txtBarcode.setEnabled)
         cv_impl.sigScanningModeOn.connect(self.actResyncCamera.setEnabled)
         cv_impl.sigRemovedBug.connect(self.data.onBugRemoved)
+        cv_impl.sigShowHint.connect(self.data.setHintText)
+        self.controlPanel.btnRefreshCamera.clicked.connect(cv_impl.refreshCamera)
+        self.data.sigSelectedBox.connect(cv_impl.onEditBoxSelected)
+        self.data.sigDeletedBox.connect(cv_impl.onEditBoxDeleted)
 
         # Finish up window
         self.setAcceptDrops(True)
@@ -60,7 +64,7 @@ class MainWindow(QtGui.QMainWindow):
         self.show()
         self.raise_()
 
-    def buildMenubar(self):
+    def buildMenubar(self, cv_impl):
         menubar = QtGui.QMenuBar()
 
         fileMenu = QtGui.QMenu(menubar)
@@ -71,9 +75,8 @@ class MainWindow(QtGui.QMainWindow):
 
         imageMenu = QtGui.QMenu(menubar)
         imageMenu.setTitle('Image')
-        imageMenu.addAction('Retrace tray area',
-            self.data.implementation.resetTrayArea)
-        self.actResyncCamera = imageMenu.addAction('Resync Camera', self.data.refreshCameraButton)
+        imageMenu.addAction('Retrace tray area', cv_impl.resetTrayArea)
+        self.actResyncCamera = imageMenu.addAction('Resync Camera', cv_impl.refreshCamera)
         self.actResyncCamera.setDisabled(True)
 
         menubar.addMenu(fileMenu)

@@ -56,7 +56,6 @@ class ControlPanel(QtGui.QFrame):
         panelLayout.addStretch(1)
 
         # Connect slots for the buttion actions
-        self.btnRefreshCamera.clicked.connect(self.data.refreshCameraButton)
         self.txtBarcode.textEdited.connect(self.data.newBugIdEntered)
 
     def setCurrentBugId(self, string):

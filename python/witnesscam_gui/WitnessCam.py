@@ -1,8 +1,10 @@
+from PySide import QtCore, QtGui
 import numpy as np
 import cv2
-from PySide import QtCore, QtGui
+
 from Pt import *
 from Util import *
+import Hints
 
 BLUE = (255, 0, 0)
 GREEN = (0, 255, 0)
@@ -14,6 +16,7 @@ class WitnessCam(QtCore.QObject):
 
     sigScanningModeOn = QtCore.Signal(bool)
     sigRemovedBug = QtCore.Signal(int)
+    sigShowHint = QtCore.Signal(str)
 
     # States/Phases the application can be in
     SELECT_POLYGON, SCANNING_MODE = range(2)
@@ -119,8 +122,8 @@ class WitnessCam(QtCore.QObject):
                 (trayHeight, trayWidth, _) = static_frame.shape
                 (u, v) = poly2square(self.polygon_model, trayWidth, trayHeight,
                                      centroid).t()
-                cv2.line(static_frame, (u-dB, v), (u+dB, v), RED, max(int(dS/5), 1))
-                cv2.line(static_frame, (u, v-dB), (u, v+dB), RED, max(int(dS/5), 1))
+                cv2.line(static_frame, (u-dB, v), (u+dB, v), RED, max(int(dB/5), 1))
+                cv2.line(static_frame, (u, v-dB), (u, v+dB), RED, max(int(dB/5), 1))
 
 
             # Draw all the boxes that have already been placed
@@ -190,8 +193,7 @@ class WitnessCam(QtCore.QObject):
         # Change phase to scanning mode
         self.phase = WitnessCam.SCANNING_MODE
 
-
-        # self.setHintText(AppData.HINT_REMOVEBUG_OR_EDIT)
+        self.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
 
     def floodFillBox(self, p, camera_mask, static_frame):
         """Given a grayscale image and a point, return a bounding box
@@ -316,7 +318,7 @@ class WitnessCam(QtCore.QObject):
                         self.setCurrentSelectionBox(placed_boxes, i)
                         self.refreshCamera()
 
-                     # self.setHintText(AppData.HINT_ENTERBARCODE)
+                    self.sigShowHint.emit(Hints.HINT_ENTERBARCODE)
 
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
@@ -435,7 +437,7 @@ class WitnessCam(QtCore.QObject):
 
         self.rescalePlacedBoxes = True
 
-         # self.setHintText(AppData.HINT_TRAYAREA_1)
+        self.sigShowHint.emit(Hints.HINT_TRAYAREA_1)
 
     def drawTrayArea(self, image, a):
         for i in range(len(self.polyPoints)):
@@ -452,14 +454,10 @@ class WitnessCam(QtCore.QObject):
         self.stableRun = 0
 
     def setCurrentSelectionBox(self, boxes, i=-1):
-        if self.removedBug != -1:
-            del boxes[self.removedBug]
-            boxes.insert(self.removedBug, self.currentSelectionBox)
-
-        if i != -1:
+        if boxes is not None and i != -1:
             self.currentSelectionBox = boxes[i]
             self.selectedEditBox = None
-            # self.setHintText(AppData.HINT_ENTERBARCODE)
+            self.sigShowHint.emit(Hints.HINT_ENTERBARCODE)
         else:
             self.currentSelectionBox = None
 
@@ -474,7 +472,7 @@ class WitnessCam(QtCore.QObject):
             self.polyPoints.append(
                 Pt(int(ev.pos().x()/scale),
                    int(ev.pos().y()/scale)))
-            # self.setHintText(AppData.HINT_TRAYAREA_234)
+            self.sigShowHint.emit(Hints.HINT_TRAYAREA_234)
 
             if len(self.polyPoints) == 4:
                 self.gotTrayArea()
@@ -488,3 +486,10 @@ class WitnessCam(QtCore.QObject):
 
     def mouseScroll(self, ev, scale):
         None
+
+    def onEditBoxSelected(self, i):
+        self.refreshCamera()
+        self.setCurrentSelectionBox(None, -1)
+
+    def onEditBoxDeleted(self, i):
+        self.refreshCamera()

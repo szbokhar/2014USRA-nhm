@@ -7,6 +7,7 @@ import sys
 
 from Util import *
 from Pt import *
+import Hints
 
 BLUE = (255, 0, 0)
 GREEN = (0, 255, 0)
@@ -15,24 +16,14 @@ WHITE = (255, 255, 255)
 CYAN = (255, 255, 0)
 
 
-class AppData:
+class AppData(QtCore.QObject):
     """Main logic controler for the digitization gui"""
 
+    sigSelectedBox = QtCore.Signal(int)
+    sigDeletedBox = QtCore.Signal(int)
+    sigTransformedBox = QtCore.Signal(int)
+
     # Hints
-    HINT_LOADFILE = "Load a tray scan image by draggging a file here or using \
-the file menu"
-    HINT_TRAYAREA_1 = "Click on the top right corner of the tray in the scanned \
-image in the live camera view."
-    HINT_TRAYAREA_234 = "Now click on the next corner clockwise"
-    HINT_REMOVEBUG_OR_EDIT = "Remove an insect from the tray and wait for it to be \
-marked with a blue circle, or click a green marker to edit"
-    HINT_REMOVEBUG = "Remove an insect from the tray and wait for it to be \
-marked with a blue circle"
-    HINT_ENTERBARCODE = "Scan the barcode for this insect"
-    HINT_REPLACE_CONTINUE = "Once the barcode is entered correctly, replace the \
-bug and remove the next one"
-    HINT_EDITBOX = "Drag box to move. Scroll to resize. Click X to delete. \
-Click another marker to edit it. Remove insect to continue with scanning"
 
     # Types of editing actions for boxes
     NO_ACTION, DG_NW, DG_N, DG_NE, DG_E, DG_SE, DG_S, DG_SW, DG_W, PAN = \
@@ -48,8 +39,10 @@ Click another marker to edit it. Remove insect to continue with scanning"
         """Initializes a bunch of member variables for use in later
         functions"""
 
+        super(AppData, self).__init__()
+
         self.window = win
-        self.implementation = cv_impl
+        self.cv_impl = cv_impl
 
         # Labels for displaying images
         self.controlPanel = None
@@ -97,7 +90,7 @@ Click another marker to edit it. Remove insect to continue with scanning"
         self.selectedEditBox = None
         self.editAction = AppData.NO_ACTION
 
-        self.setHintText(AppData.HINT_LOADFILE)
+        self.setHintText(Hints.HINT_LOADFILE)
 
     def setGuiElements(self, control, big, small):
         """Associate the elements of the gui with the application data.
@@ -118,7 +111,7 @@ Click another marker to edit it. Remove insect to continue with scanning"
         self.lblBig.sigMouseRelease.connect(self.bigLabelMouseRelease)
         self.lblBig.sigScroll.connect(self.bigLabelScroll)
 
-        self.setHintText(AppData.HINT_LOADFILE)
+        self.setHintText(Hints.HINT_LOADFILE)
 
     def setTrayScan(self, image_fname, csv_fname):
         """Load the tray scan image and activate the camera.
@@ -158,7 +151,7 @@ Click another marker to edit it. Remove insect to continue with scanning"
         # Start the camera loop
         self.startCameraFeed()
 
-        self.setHintText(AppData.HINT_TRAYAREA_1)
+        self.setHintText(Hints.HINT_TRAYAREA_1)
 
     def startCameraFeed(self):
         """Begin the camera feed and set up the timer loop."""
@@ -184,11 +177,11 @@ Click another marker to edit it. Remove insect to continue with scanning"
 
         # Process and modify the camera and static frames
         (big_image, small_image, self.placedBoxes) =\
-            self.implementation.amendFrame(self.cameraImage, self.trayImage,
+            self.cv_impl.amendFrame(self.cameraImage, self.trayImage,
             self.lblBig.imageScaleRatio, self.lblSmall.imageScaleRatio,
             self.placedBoxes)
 
-        if self.implementation.allowEditing():
+        if self.cv_impl.allowEditing():
             dB = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
             self.draw_editing_ui(big_image, GREEN, RED, BLUE, dB)
 
@@ -234,10 +227,6 @@ Click another marker to edit it. Remove insect to continue with scanning"
                 cv2.line(image, (px+a, py), (px-a, py), col, t)
                 cv2.circle(image, (px, py), a, col, t)
 
-    def refreshCameraButton(self):
-        """When the refresh camer button is pressed"""
-        self.implementation.refreshCamera()
-
     def exportToCSV(self):
         """Called when the Export to CSV button is pressed"""
 
@@ -268,9 +257,10 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         scale -- scale constant between the size of the label and the size
             of the big label"""
 
-        self.implementation.mousePress(ev, scale)
+        if self.trayPath is not None:
+            self.cv_impl.mousePress(ev, scale)
 
-        if self.implementation.allowEditing():
+        if self.cv_impl.allowEditing():
             self.editMousePress(ev)
 
     def bigLabelMouseMove(self, ev, scale):
@@ -280,13 +270,15 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         ev -- PySide.QtGui.QMouseEvent object
         scale -- scale constant between the size of the label and the size
             of the big label"""
+
         self.setMousepos(int(ev.pos().x()/scale),
                          int(ev.pos().y()/scale))
         self.lblBig.setCursor(self.normalCursor)
 
-        self.implementation.mouseMove(ev, scale)
+        if self.trayPath is not None:
+            self.cv_impl.mouseMove(ev, scale)
 
-        if self.implementation.allowEditing():
+        if self.cv_impl.allowEditing():
             self.editMouseMove()
 
     def bigLabelMouseRelease(self, ev, scale):
@@ -294,8 +286,10 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
 
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent object"""
-        self.implementation.mouseRelease(ev, scale)
-        if self.implementation.allowEditing():
+
+        if self.trayPath is not None:
+            self.cv_impl.mouseRelease(ev, scale)
+        if self.cv_impl.allowEditing():
             self.editMouseRelease()
 
     def bigLabelScroll(self, ev, scale):
@@ -303,8 +297,8 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
 
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent object"""
-        self.implementation.mouseScroll(ev, scale)
-        if self.implementation.allowEditing():
+        self.cv_impl.mouseScroll(ev, scale)
+        if self.cv_impl.allowEditing():
             self.editMouseScroll(ev)
 
     def editMousePress(self, ev):
@@ -344,12 +338,11 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.editAction = AppData.PAN
                 elif pointInBox(p, (x2+a, y1-3*a, x2+3*a, y1-a)):
-                    if self.removedBug == self.selectedEditBox:
-                        self.implementation.refreshCamera()
                     del self.placedBoxes[self.selectedEditBox]
                     self.selectedEditBox = None
 
-                    self.implementation.refreshCamera()
+                    self.sigDeletedBox.emit(self.selectedEditBox)
+                    self.controlPanel.setCurrentBugId('')
 
                 if self.editAction != AppData.NO_ACTION:
                     return
@@ -360,17 +353,17 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         for i in range(len(self.placedBoxes)):
             (x1, y1, x2, y2) = self.placedBoxes[i].static
             if pointInBox((mx, my), (x1-c, y1-c, x2+c, y2+c)):
+                self.sigSelectedBox.emit(i)
                 clickedOn = True
                 self.selectedEditBox = i
                 self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
-                self.implementation.refreshCamera()
-                self.implementation.setCurrentSelectionBox(self.placedBoxes, -1)
-                self.setHintText(AppData.HINT_EDITBOX)
+                self.setHintText(Hints.HINT_EDITBOX)
 
         # Check for deselect of box
         if not clickedOn:
             self.selectedEditBox = None
-            self.setHintText(AppData.HINT_REMOVEBUG)
+            self.setHintText(Hints.HINT_REMOVEBUG)
+            self.controlPanel.setCurrentBugId('')
 
     def editMouseMove(self):
         """Called when the application is in edit mode and the mouse is moved
@@ -456,6 +449,9 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
     def editMouseRelease(self):
         """Called when the application is in edit mode and the mouse is released
         on the big label."""
+        if self.editAction != AppData.NO_ACTION and self.selectedEditBox != -1:
+            self.sigTransformedBox.emit(self.selectedEditBox)
+
         self.editAction = AppData.NO_ACTION
 
     def editMouseScroll(self, ev):
@@ -466,6 +462,7 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
             d = d/abs(d)
 
         if self.selectedEditBox is not None:
+            self.sigTransformedBox.emit(self.selectedEditBox)
             b = self.placedBoxes[self.selectedEditBox]
             (x1, y1, x2, y2) = b.static
             rat = (y2-y1)/float(x2-x1)
@@ -477,7 +474,7 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
     def newBugIdEntered(self, bid):
         if self.removedBug != -1:
             self.placedBoxes[self.removedBug].name = bid
-            self.setHintText(AppData.HINT_REPLACE_CONTINUE)
+            self.setHintText(Hints.HINT_REPLACE_CONTINUE)
         elif self.selectedEditBox is not None and self.selectedEditBox != -1:
             self.placedBoxes[self.selectedEditBox].name = bid
 
