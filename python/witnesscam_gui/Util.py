@@ -240,6 +240,17 @@ def pointInBox(p, box):
 
     return x > x1 and x < x2 and y > y1 and y < y2
 
+def dedup_list(seq, idfun=None):
+    if idfun is None:
+        def idfun(x): return x
+    seen = {}
+    result = []
+    for i in seq:
+        marker = idfun(i)
+        if marker in seen: continue
+        seen[marker] = 1
+        result.append(i)
+    return result
 
 class BugBox:
     def __init__(self, name, livebox, staticbox, pt):

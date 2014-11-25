@@ -22,6 +22,7 @@ class AppData(QtCore.QObject):
     sigSelectedBox = QtCore.Signal(int)
     sigDeletedBox = QtCore.Signal(int)
     sigTransformedBox = QtCore.Signal(int)
+    sigShowHint = QtCore.Signal(str)
 
     # Hints
 
@@ -90,7 +91,7 @@ class AppData(QtCore.QObject):
         self.selectedEditBox = None
         self.editAction = AppData.NO_ACTION
 
-        self.setHintText(Hints.HINT_LOADFILE)
+        self.sigShowHint.emit(Hints.HINT_LOADFILE)
 
     def setGuiElements(self, control, big, small):
         """Associate the elements of the gui with the application data.
@@ -111,7 +112,7 @@ class AppData(QtCore.QObject):
         self.lblBig.sigMouseRelease.connect(self.bigLabelMouseRelease)
         self.lblBig.sigScroll.connect(self.bigLabelScroll)
 
-        self.setHintText(Hints.HINT_LOADFILE)
+        self.sigShowHint.emit(Hints.HINT_LOADFILE)
 
     def setTrayScan(self, image_fname, csv_fname):
         """Load the tray scan image and activate the camera.
@@ -124,6 +125,8 @@ class AppData(QtCore.QObject):
 
         # Clear data
         self.reset()
+        self.cv_impl.reset()
+        self.controlPanel.setCurrentBugId('')
 
         # Load the image
         self.trayPath = image_fname
@@ -151,7 +154,7 @@ class AppData(QtCore.QObject):
         # Start the camera loop
         self.startCameraFeed()
 
-        self.setHintText(Hints.HINT_TRAYAREA_1)
+        self.sigShowHint.emit(Hints.HINT_TRAYAREA_1)
 
     def startCameraFeed(self):
         """Begin the camera feed and set up the timer loop."""
@@ -357,12 +360,12 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
                 clickedOn = True
                 self.selectedEditBox = i
                 self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
-                self.setHintText(Hints.HINT_EDITBOX)
+                self.sigShowHint.emit(Hints.HINT_EDITBOX)
 
         # Check for deselect of box
         if not clickedOn:
             self.selectedEditBox = None
-            self.setHintText(Hints.HINT_REMOVEBUG)
+            self.sigShowHint.emit(Hints.HINT_REMOVEBUG)
             self.controlPanel.setCurrentBugId('')
 
     def editMouseMove(self):
@@ -474,7 +477,7 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
     def newBugIdEntered(self, bid):
         if self.removedBug != -1:
             self.placedBoxes[self.removedBug].name = bid
-            self.setHintText(Hints.HINT_REPLACE_CONTINUE)
+            self.sigShowHint.emit(Hints.HINT_REPLACE_CONTINUE)
         elif self.selectedEditBox is not None and self.selectedEditBox != -1:
             self.placedBoxes[self.selectedEditBox].name = bid
 
@@ -482,14 +485,10 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         self.exportToCSV()
         QtCore.QCoreApplication.instance().quit()
 
-    def setHintText(self, text):
-        if self.controlPanel is not None:
-            self.controlPanel.lblHint.setText(text)
-
     def onBugRemoved(self, i):
         if i != -1:
             self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
-            self.selectedEditBox = -1
+            self.selectedEditBox = None
         else:
             self.controlPanel.setCurrentBugId('')
 

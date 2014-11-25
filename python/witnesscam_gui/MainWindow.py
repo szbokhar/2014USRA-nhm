@@ -1,12 +1,14 @@
 from PySide import QtCore, QtGui
+from functools import partial
 
 from AppData import *
 from GUIParts import *
+from Util import *
 
 
 class MainWindow(QtGui.QMainWindow):
 
-    originalSize = (800, 600)
+    originalSize = (864, 486)
     sigLoadTrayImage = QtCore.Signal(str, str)
 
     def __init__(self, cv_impl, fname=None):
@@ -26,18 +28,30 @@ class MainWindow(QtGui.QMainWindow):
         self.lblSmall = SmallLabel(self.data)
         self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
 
-        self.sidePanel = QtGui.QFrame()
-        self.sideContent = QtGui.QHBoxLayout(self)
+        self.lblHint = QtGui.QLabel('')
+        self.lblHint.setAlignment(QtCore.Qt.AlignHCenter)
+        self.lblHint.setWordWrap(True)
+        self.lblHint.setFixedHeight(50)
+
+        self.topPanel = QtGui.QFrame()
+        self.topContent = QtGui.QHBoxLayout(self)
+        self.bottomPanel = QtGui.QFrame()
+        self.bottomContent = QtGui.QHBoxLayout(self)
 
         # Add GUI elements to window
         mainWidget.setLayout(mainContent)
-        self.sidePanel.setLayout(self.sideContent)
+        self.bottomPanel.setLayout(self.bottomContent)
+        self.topPanel.setLayout(self.topContent)
         self.setCentralWidget(mainWidget)
 
-        mainContent.addWidget(self.lblBig)
-        mainContent.addWidget(self.sidePanel)
-        self.sideContent.addWidget(self.lblSmall)
-        self.sideContent.addWidget(self.controlPanel)
+        mainContent.addWidget(self.topPanel)
+        mainContent.addWidget(self.lblHint)
+        mainContent.addWidget(self.bottomPanel)
+        self.topContent.addStretch(1)
+        self.topContent.addWidget(self.lblBig)
+        self.topContent.addStretch(1)
+        self.bottomContent.addWidget(self.lblSmall)
+        self.bottomContent.addWidget(self.controlPanel)
 
         # Setup menu bar
         self.buildMenubar(cv_impl)
@@ -47,14 +61,13 @@ class MainWindow(QtGui.QMainWindow):
 
         # Wire up signals and slots
         self.sigLoadTrayImage.connect(self.data.setTrayScan)
-        cv_impl.sigScanningModeOn.connect(self.controlPanel.btnRefreshCamera.setEnabled)
         cv_impl.sigScanningModeOn.connect(self.controlPanel.txtBarcode.setEnabled)
         cv_impl.sigScanningModeOn.connect(self.actResyncCamera.setEnabled)
         cv_impl.sigRemovedBug.connect(self.data.onBugRemoved)
-        cv_impl.sigShowHint.connect(self.data.setHintText)
-        self.controlPanel.btnRefreshCamera.clicked.connect(cv_impl.refreshCamera)
+        cv_impl.sigShowHint.connect(self.lblHint.setText)
         self.data.sigSelectedBox.connect(cv_impl.onEditBoxSelected)
         self.data.sigDeletedBox.connect(cv_impl.onEditBoxDeleted)
+        self.data.sigShowHint.connect(self.lblHint.setText)
 
         # Finish up window
         self.setAcceptDrops(True)
@@ -65,13 +78,24 @@ class MainWindow(QtGui.QMainWindow):
         self.raise_()
 
     def buildMenubar(self, cv_impl):
+
+
         menubar = QtGui.QMenuBar()
 
         fileMenu = QtGui.QMenu(menubar)
         fileMenu.setTitle('File')
-        fileMenu.addAction('Load Tray Image', self.selectTrayImage)
+        fileMenu.addAction('Open Tray Image', self.selectTrayImage)
+
+        recentMenu = fileMenu.addMenu('Open Recent Tray Scans')
+        if os.path.isfile('.recentScans.dat'):
+            with open('.recentScans.dat', 'r') as recent_file:
+                for path in recent_file.readlines():
+                    fname = path.split('/')[-1]
+                    recentMenu.addAction(fname, partial(self.selectTrayImage, path[0:-1]))
+        fileMenu.addSeparator()
         fileMenu.addAction('Export to CSV', self.data.exportToCSV)
-        fileMenu.addAction('Exit', self.data.quit)
+        fileMenu.addAction('Quit', self.data.quit)
+
 
         imageMenu = QtGui.QMenu(menubar)
         imageMenu.setTitle('Image')
@@ -108,6 +132,22 @@ class MainWindow(QtGui.QMainWindow):
             csvfile = '.'.join(csvfile)
             csvfile = self.currentPath+"/"+csvfile
             self.sigLoadTrayImage.emit(fname, csvfile)
+            print(fname)
+
+            recent_files = []
+            if os.path.isfile('.recentScans.dat'):
+                with open('.recentScans.dat', 'r') as recent_file:
+                    for line in recent_file.readlines():
+                        recent_files.append(line[0:-1])
+
+            recent_files.insert(0, fname)
+            recent_files = dedup_list(recent_files)
+
+            with open('.recentScans.dat', 'w') as recent_file:
+                for f in recent_files:
+                    recent_file.write(f+'\n')
+
+
 
     def dragEnterEvent(self, ev):
         if ev.mimeData().hasUrls():
