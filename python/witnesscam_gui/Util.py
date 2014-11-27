@@ -377,8 +377,8 @@ class BugBoxList:
             self.boxes[index].point = point
 
 
-    def recordAction(self, action, stack, clearRedo=True):
-        if len(stack) == 0 or not stack[-1].merge(action):
+    def recordAction(self, action, stack, clearRedo=True, allowMerge=True):
+        if len(stack) == 0 or not allowMerge or not stack[-1].merge(action):
             stack.append(action)
             if clearRedo:
                 self.redoStack = []
@@ -395,15 +395,15 @@ class BugBoxList:
             act = stack1[-1]
             del stack1[-1]
         else:
-            return -1
+            return None
 
 
         if act.action == BugBoxList.Action.CREATE_BOX:
-            self.recordAction(BugBoxList.Action.deleteBox(act.index, self.boxes[act.index]), stack2, False)
+            self.recordAction(BugBoxList.Action.deleteBox(act.index, self.boxes[act.index]), stack2, False, False)
             del self.boxes[act.index]
             return -1
         elif act.action == BugBoxList.Action.DELETE_BOX:
-            self.recordAction(BugBoxList.Action.newBox(act.index), stack2, False)
+            self.recordAction(BugBoxList.Action.newBox(act.index), stack2, False, False)
             self.boxes.insert(act.index, act.box)
             return act.index
         elif act.action == BugBoxList.Action.TRANSFORM_BOX_FROM:
@@ -414,7 +414,7 @@ class BugBoxList:
                 static= self.boxes[i].static if act.static is not None else None,
                 live= self.boxes[i].live if act.live is not None else None,
                 point= self.boxes[i].point if act.point is not None else None),
-                stack2, False)
+                stack2, False, False)
             self.boxes[i].name = act.name if act.name is not None else self.boxes[i].name
             self.boxes[i].static = act.static if act.static is not None else self.boxes[i].static
             self.boxes[i].live = act.live if act.live is not None else self.boxes[i].live
@@ -426,3 +426,7 @@ class BugBoxList:
 
     def redo(self):
         return self.undoRedo(undo=False)
+
+    def clearUndoRedoStacks(self):
+        self.undoStack = []
+        self.redoStack = []

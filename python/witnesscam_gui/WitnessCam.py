@@ -55,6 +55,8 @@ class WitnessCam(QtCore.QObject):
         self.lastStableAverage = 0
         self.lastMedpos = None
 
+        self.camera_image = None
+
     def amendFrame(self, camera_frame, static_frame, big_scale, small_scale,
                    placed_boxes):
         """Takes the raw (resized) camera frame, and the plain tray image and
@@ -359,9 +361,6 @@ class WitnessCam(QtCore.QObject):
         """Called when the user has selected the four points that represent
         the corners of the insect tray in the camera view."""
 
-        # Save the current view of the camera
-        self.refreshCamera()
-
         # Get the axis aligned bounding box for the tray area selection
         (minx, miny, maxx, maxy) = \
             (self.polyPoints[0].x, self.polyPoints[0].y, 0, 0)
@@ -378,6 +377,9 @@ class WitnessCam(QtCore.QObject):
 
         # Change phase to scanning mode
         self.phase = WitnessCam.SCANNING_MODE
+
+        # Save the current view of the camera
+        self.refreshCamera()
 
         self.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
 
@@ -457,10 +459,11 @@ class WitnessCam(QtCore.QObject):
     def refreshCamera(self):
         """Save the current camera view as the background, and reset some
         counters"""
-        self.camBackground = np.copy(self.camera_image)
-        self.camBackground = cv2.cvtColor(self.camBackground,
-                                          cv2.cv.CV_BGR2Lab)
-        self.stableRun = 0
+        if self.phase is WitnessCam.SCANNING_MODE:
+            self.camBackground = np.copy(self.camera_image)
+            self.camBackground = cv2.cvtColor(self.camBackground,
+                                              cv2.cv.CV_BGR2Lab)
+            self.stableRun = 0
 
     def setCurrentSelectionBox(self, boxes, i=-1):
         if boxes is not None and i != -1:

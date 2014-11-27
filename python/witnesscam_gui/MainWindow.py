@@ -30,6 +30,7 @@ class MainWindow(QtGui.QMainWindow):
         self.lblBig = BigLabel(self.data)
         self.lblSmall = SmallLabel(self.data)
         self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
+        self.controlPanel.txtBarcode.installEventFilter(self)
 
         self.lblHint = QtGui.QLabel('')
         self.lblHint.setAlignment(QtCore.Qt.AlignHCenter)
@@ -84,8 +85,6 @@ class MainWindow(QtGui.QMainWindow):
         self.raise_()
 
     def buildMenubar(self, cv_impl):
-
-
         menubar = QtGui.QMenuBar()
 
         fileMenu = QtGui.QMenu(menubar)
@@ -173,3 +172,10 @@ class MainWindow(QtGui.QMainWindow):
 
         if ev.mimeData().hasUrls():
             self.selectTrayImage(ev.mimeData().urls()[0].path())
+
+    def eventFilter(self, obj, event):
+        if obj == self.controlPanel.txtBarcode and event.type() == QtCore.QEvent.Type.ShortcutOverride:
+            if event.matches(QtGui.QKeySequence.Undo) or\
+                    event.matches(QtGui.QKeySequence.Redo):
+                return True
+        return QtGui.QMainWindow.eventFilter(self, obj, event)

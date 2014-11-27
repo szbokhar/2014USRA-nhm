@@ -155,6 +155,7 @@ class AppData(QtCore.QObject):
         self.startCameraFeed()
 
         self.sigShowHint.emit(Hints.HINT_TRAYAREA_1)
+        self.placedBoxes.clearUndoRedoStacks()
 
     def startCameraFeed(self):
         """Begin the camera feed and set up the timer loop."""
@@ -498,10 +499,12 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         i = self.placedBoxes.undo()
         self.sigSelectedBox.emit(i)
         self.selectedEditBox = i
-        self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+        if i >= 0 and i < len(self.placedBoxes):
+            self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
 
     def redoAction(self):
         i = self.placedBoxes.redo()
         self.sigSelectedBox.emit(i)
         self.selectedEditBox = i
-        self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+        if i >= 0 and i < len(self.placedBoxes):
+            self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
