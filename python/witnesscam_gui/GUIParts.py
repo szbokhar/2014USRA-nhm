@@ -117,6 +117,15 @@ class BigLabel(QtGui.QLabel):
     def generateInitialImage(self):
         (w,h) = self.originalSize
         img = np.zeros((h, w, 4), np.uint8)
+
+        b = 4*h/10
+        for text in ['Drag and Drop tray scan image file here',
+                     'or load it from the File menu']:
+            ((tw,th), _) = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 1)
+            cv2.putText(img, text, ((w-tw)/2, b), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0,255), 2)
+            b += th + 10
+        cv2.GaussianBlur(img, (3,3), 0.5, img)
+
         s = w/(2*20+1)
         for i in range(0,w+100,s)[0::2]:
             cv2.rectangle(img, (i,0), (i+s, 2), (0,0,0,128), -1)
@@ -125,13 +134,6 @@ class BigLabel(QtGui.QLabel):
         for i in range(0,h+100,s)[0::2]:
             cv2.rectangle(img, (0,i), (2,i+s), (0,0,0,128), -1)
             cv2.rectangle(img, (w-1,i), (w-3,i+s), (0,0,0,128), -1)
-
-        b = 4*h/10
-        for text in ['Drag and Drop tray scan image file here',
-                     'or load it from the File menu']:
-            ((tw,th), _) = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 1)
-            cv2.putText(img, text, ((w-tw)/2, b), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0,255), 2)
-            b += th + 10
         self.setImage(img)
 
 

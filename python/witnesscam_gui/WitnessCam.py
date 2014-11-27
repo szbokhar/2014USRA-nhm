@@ -95,10 +95,6 @@ class WitnessCam(QtCore.QObject):
             if self.rescalePlacedBoxes:
                 for i in range(len(placed_boxes)):
                     (x, y) = placed_boxes[i].point
-                    placed_boxes[i].point = (int(x), int(y))
-                    (x1, y1, x2, y2) = placed_boxes[i].static
-                    placed_boxes[i].static =\
-                        (int(x1), int(y1), int(x2), int(y2))
                     (x1, y1, x2, y2) = placed_boxes[i].static
 
                     (h, w, _) = static_frame.shape
@@ -112,7 +108,7 @@ class WitnessCam(QtCore.QObject):
                     y2 = max(p1.y, p2.y, p3.y, p4.y)
                     placed_boxes[i].live = (x1, y1, x2, y2)
 
-            self.rescalePlacedBoxes = True
+            self.rescalePlacedBoxes = False
 
             # Check if an insect has been moved from/to the tray, and get its
             # position in the camera frame
@@ -350,7 +346,7 @@ class WitnessCam(QtCore.QObject):
                                      self.stableBox[1],
                                      self.stableBox[0],
                                      self.stableBox[2])
-                        placed_boxes.append(box)
+                        placed_boxes.newBox(box)
                         self.setCurrentSelectionBox(placed_boxes, len(placed_boxes)-1)
                         self.refreshCamera()
                     else:

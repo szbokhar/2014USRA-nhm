@@ -1,6 +1,7 @@
 from PySide import QtCore, QtGui
 import cv2
 import csv
+import copy
 import numpy as np
 import os.path
 import sys
@@ -23,8 +24,6 @@ class AppData(QtCore.QObject):
     sigDeletedBox = QtCore.Signal(int)
     sigTransformedBox = QtCore.Signal(int)
     sigShowHint = QtCore.Signal(str)
-
-    # Hints
 
     # Types of editing actions for boxes
     NO_ACTION, DG_NW, DG_N, DG_NE, DG_E, DG_SE, DG_S, DG_SW, DG_W, PAN = \
@@ -82,7 +81,7 @@ class AppData(QtCore.QObject):
         self.removedBug = -1
 
         # Variables used in keeping track of the placed boxes
-        self.placedBoxes = []
+        self.placedBoxes = BugBoxList()
         self.stableBoxRun = 0
         self.stableBox = None
         self.rescalePlacedboxes = False
@@ -91,6 +90,7 @@ class AppData(QtCore.QObject):
         self.selectedEditBox = None
         self.editAction = AppData.NO_ACTION
 
+        # Show Hint
         self.sigShowHint.emit(Hints.HINT_LOADFILE)
 
     def setGuiElements(self, control, big, small):
@@ -137,12 +137,12 @@ class AppData(QtCore.QObject):
         if os.path.isfile(csv_fname):
             with open(csv_fname) as csvfile:
                 reader = csv.reader(csvfile)
-                self.placedBoxes = []
+                self.placedBoxes = BugBoxList()
                 if (reader.next()[1] == ' Rectangle x1'):
                     for b in reader:
                         box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]),
                                      int(b[4])), (int(b[5]), int(b[6])))
-                        self.placedBoxes.append(box)
+                        self.placedBoxes.newBox(box)
 
                     self.window.statusBar().showMessage('Also loaded CSV file: ' + str(csv_fname.split('/')[-1]))
                 else:
@@ -341,7 +341,7 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.editAction = AppData.PAN
                 elif pointInBox(p, (x2+a, y1-3*a, x2+3*a, y1-a)):
-                    del self.placedBoxes[self.selectedEditBox]
+                    self.placedBoxes.delete(self.selectedEditBox)
                     self.selectedEditBox = None
 
                     self.sigDeletedBox.emit(self.selectedEditBox)
@@ -444,8 +444,8 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
                     newPoint = (px + dx, py + dy)
                     self.lblBig.setCursor(self.midpanCursor)
 
-                b.static = newBox
-                b.point = newPoint
+                self.placedBoxes.changeBox(
+                    self.selectedEditBox, static=newBox, point=newPoint)
 
         self.bigMLastPos = self.bigMPos
 
@@ -472,14 +472,14 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
             (x1, y1, x2, y2) = (x1-d, y1-int(d*rat), x2+d ,y2+int(d*rat))
             (x1, y1, x2, y2) = (min(x1,x2), min(y1,y2), max(x1,x2), max(y1,y2))
             if abs(x1-x2) > 15 and abs(y1-y2) > 15:
-                b.static = (x1,y1,x2,y2)
+                self.placedBoxes.changeBox(self.selectedEditBox, static=(x1,y1,x2,y2))
 
     def newBugIdEntered(self, bid):
         if self.removedBug != -1:
-            self.placedBoxes[self.removedBug].name = bid
+            self.placedBoxes.changeBox(self.removedBug, name=bid)
             self.sigShowHint.emit(Hints.HINT_REPLACE_CONTINUE)
         elif self.selectedEditBox is not None and self.selectedEditBox != -1:
-            self.placedBoxes[self.selectedEditBox].name = bid
+            self.placedBoxes.changeBox(self.selectedEditBox, name=bid)
 
     def quit(self):
         self.exportToCSV()
@@ -493,3 +493,15 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
             self.controlPanel.setCurrentBugId('')
 
         self.removedBug = i
+
+    def undoAction(self):
+        i = self.placedBoxes.undo()
+        self.sigSelectedBox.emit(i)
+        self.selectedEditBox = i
+        self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+
+    def redoAction(self):
+        i = self.placedBoxes.redo()
+        self.sigSelectedBox.emit(i)
+        self.selectedEditBox = i
+        self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)

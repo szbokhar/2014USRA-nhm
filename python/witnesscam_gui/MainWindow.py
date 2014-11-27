@@ -10,6 +10,9 @@ class MainWindow(QtGui.QMainWindow):
 
     originalSize = (864, 486)
     sigLoadTrayImage = QtCore.Signal(str, str)
+    sigUndoAction = QtCore.Signal()
+    sigRedoAction = QtCore.Signal()
+    sigQuitAction = QtCore.Signal()
 
     def __init__(self, cv_impl, fname=None):
         super(MainWindow, self).__init__()
@@ -61,6 +64,9 @@ class MainWindow(QtGui.QMainWindow):
 
         # Wire up signals and slots
         self.sigLoadTrayImage.connect(self.data.setTrayScan)
+        self.sigQuitAction.connect(self.data.quit)
+        self.sigUndoAction.connect(self.data.undoAction)
+        self.sigRedoAction.connect(self.data.redoAction)
         cv_impl.sigScanningModeOn.connect(self.controlPanel.txtBarcode.setEnabled)
         cv_impl.sigScanningModeOn.connect(self.actResyncCamera.setEnabled)
         cv_impl.sigRemovedBug.connect(self.data.onBugRemoved)
@@ -84,7 +90,7 @@ class MainWindow(QtGui.QMainWindow):
 
         fileMenu = QtGui.QMenu(menubar)
         fileMenu.setTitle('File')
-        fileMenu.addAction('Open Tray Image', self.selectTrayImage)
+        fileMenu.addAction('Open Tray Image', self.selectTrayImage).setShortcut(QtGui.QKeySequence.Open)
 
         recentMenu = fileMenu.addMenu('Open Recent Tray Scans')
         if os.path.isfile('.recentScans.dat'):
@@ -93,9 +99,13 @@ class MainWindow(QtGui.QMainWindow):
                     fname = path.split('/')[-1]
                     recentMenu.addAction(fname, partial(self.selectTrayImage, path[0:-1]))
         fileMenu.addSeparator()
-        fileMenu.addAction('Export to CSV', self.data.exportToCSV)
-        fileMenu.addAction('Quit', self.data.quit)
+        fileMenu.addAction('Export to CSV', self.data.exportToCSV).setShortcut(QtGui.QKeySequence.Save)
+        fileMenu.addAction('Quit', self.sigQuitAction.emit).setShortcut(QtGui.QKeySequence.Quit)
 
+        editMenu = QtGui.QMenu(menubar)
+        editMenu.setTitle(' Edit')
+        editMenu.addAction('Undo', self.sigUndoAction.emit).setShortcut(QtGui.QKeySequence.Undo)
+        editMenu.addAction('Redo', self.sigRedoAction.emit).setShortcut(QtGui.QKeySequence.Redo)
 
         imageMenu = QtGui.QMenu(menubar)
         imageMenu.setTitle('Image')
@@ -104,6 +114,7 @@ class MainWindow(QtGui.QMainWindow):
         self.actResyncCamera.setDisabled(True)
 
         menubar.addMenu(fileMenu)
+        menubar.addMenu(editMenu)
         menubar.addMenu(imageMenu)
 
         self.setMenuBar(menubar)
