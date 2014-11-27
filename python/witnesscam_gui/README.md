@@ -17,7 +17,7 @@ support Python3.
 - Numpy: [http://www.numpy.org/](http://www.numpy.org/)
 - PySide: [http://qt-project.org/wiki/PySideDocumentation](
   http://qt-project.org/wiki/PySideDocumentation)
-- OpenCV: [http://www.scipy.org/](http://www.scipy.org/)
+- OpenCV: [http://opencv.org/](http://opencv.org/)
 
 
 On Mac these can be installed using MacPorts:
