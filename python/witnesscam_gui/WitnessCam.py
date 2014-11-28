@@ -39,6 +39,7 @@ class WitnessCam(QtCore.QObject):
     def reset(self):
         self.phase = WitnessCam.SELECT_POLYGON
         self.polyPoints = []
+        self.polyPointsRedo = []
         self.polygon_model = None
         self.rescalePlacedBoxes = True
         self.mouse_position_big_label = (0, 0)
@@ -149,6 +150,8 @@ class WitnessCam(QtCore.QObject):
 
             if len(self.polyPoints) == 4:
                 self.gotTrayArea()
+
+            self.polyPointRedo = []
 
     def mouseMove(self, ev, scale):
         self.mouse_position_big_label = \
@@ -481,3 +484,20 @@ class WitnessCam(QtCore.QObject):
 
     def onEditBoxDeleted(self, i):
         self.refreshCamera()
+
+    def undo(self):
+        if self.phase == WitnessCam.SELECT_POLYGON and len(self.polyPoints) > 0:
+            self.polyPointsRedo.append(self.polyPoints[-1])
+            del self.polyPoints[-1]
+            return True
+        else:
+            return False
+
+    def redo(self):
+        if self.phase == WitnessCam.SELECT_POLYGON and len(self.polyPointsRedo) > 0:
+            self.polyPoints.append(self.polyPointsRedo[-1])
+            del self.polyPointsRedo[-1]
+            return True
+        else:
+            return False
+

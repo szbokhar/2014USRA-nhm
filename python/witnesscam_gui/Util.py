@@ -430,3 +430,21 @@ class BugBoxList:
     def clearUndoRedoStacks(self):
         self.undoStack = []
         self.redoStack = []
+
+class InteractionLogger:
+    def __init__(self, filename=None):
+        self.filename = filename
+        self.loggingFile = None
+        self.startTime = time()
+
+    def start(self):
+        if self.filename is not None:
+            self.loggingFile = open(self.filename, 'w')
+
+    def stop(self):
+        if self.loggingFile is not None:
+            self.loggingFile.close()
+
+    def log(self, string):
+        if self.loggingFile is not None:
+            self.loggingFile.write(str(time() - self.startTime) + " " + string + "\n")

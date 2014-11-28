@@ -35,7 +35,7 @@ class AppData(QtCore.QObject):
     CAM_MAX_HEIGHT = 480
 
 
-    def __init__(self, win, cv_impl):
+    def __init__(self, win, cv_impl, logfile=None):
         """Initializes a bunch of member variables for use in later
         functions"""
 
@@ -67,6 +67,8 @@ class AppData(QtCore.QObject):
         self.selectCursor = QtGui.QCursor(QtCore.Qt.CrossCursor)
         self.deleteCursor = QtGui.QCursor(QtCore.Qt.PointingHandCursor)
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+
+        self.logger = InteractionLogger(logfile)
 
         self.reset()
 
@@ -496,15 +498,17 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         self.removedBug = i
 
     def undoAction(self):
-        i = self.placedBoxes.undo()
-        self.sigSelectedBox.emit(i)
-        self.selectedEditBox = i
-        if i >= 0 and i < len(self.placedBoxes):
-            self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+        if not self.cv_impl.undo():
+            i = self.placedBoxes.undo()
+            self.sigSelectedBox.emit(i)
+            self.selectedEditBox = i
+            if i >= 0 and i < len(self.placedBoxes):
+                self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
 
     def redoAction(self):
-        i = self.placedBoxes.redo()
-        self.sigSelectedBox.emit(i)
-        self.selectedEditBox = i
-        if i >= 0 and i < len(self.placedBoxes):
-            self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+        if not self.cv_impl.redo():
+            i = self.placedBoxes.redo()
+            self.sigSelectedBox.emit(i)
+            self.selectedEditBox = i
+            if i >= 0 and i < len(self.placedBoxes):
+                self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)

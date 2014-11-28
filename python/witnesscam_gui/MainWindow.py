@@ -25,7 +25,7 @@ class MainWindow(QtGui.QMainWindow):
         mainContent = QtGui.QVBoxLayout(self)
 
         # Setup Gui Elements
-        self.data = AppData(self, cv_impl)
+        self.data = AppData(self, cv_impl, fname)
         self.controlPanel = ControlPanel(self.data)
         self.lblBig = BigLabel(self.data)
         self.lblSmall = SmallLabel(self.data)
