@@ -143,15 +143,18 @@ class WitnessCam(QtCore.QObject):
 
     def mousePress(self, ev, scale):
         if self.phase == WitnessCam.SELECT_POLYGON:
-            self.polyPoints.append(
-                Pt(int(ev.pos().x()/scale),
-                   int(ev.pos().y()/scale)))
-            self.sigShowHint.emit(Hints.HINT_TRAYAREA_234)
+            point = Pt(int(ev.pos().x()/scale), int(ev.pos().y()/scale))
 
-            if len(self.polyPoints) == 4:
-                self.gotTrayArea()
+            if any(map(lambda p: p==point, self.polyPoints)):
+                self.sigShowHint.emit(Hints.HINT_TRAYAREA_BADPOINT)
+            else:
+                self.polyPoints.append(point)
+                self.sigShowHint.emit(Hints.HINT_TRAYAREA_234)
 
-            self.polyPointRedo = []
+                if len(self.polyPoints) == 4:
+                    self.gotTrayArea()
+
+                self.polyPointRedo = []
 
     def mouseMove(self, ev, scale):
         self.mouse_position_big_label = \
