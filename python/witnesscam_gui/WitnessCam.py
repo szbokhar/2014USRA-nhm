@@ -19,7 +19,7 @@ class WitnessCam(QtCore.QObject):
     sigShowHint = QtCore.Signal(str)
 
     # States/Phases the application can be in
-    SELECT_POLYGON, SCANNING_MODE = range(2)
+    SELECT_POLYGON, CALIBRATION, SCANNING_MODE = range(3)
 
     DRAW_DELTA = 10
     ACTION_DELAY = 25
@@ -286,7 +286,8 @@ class WitnessCam(QtCore.QObject):
             if i == self.removedBug:
                 col = active
                 ((_,h),_) = cv2.getTextSize(boxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
-                cv2.putText(image, boxes[i].name, (px-2*a, py+a+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
+                cv2.putText(image, boxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
+                cv2.rectangle(image, b[0:2], b[2:4], active, t)
             else:
                 col = regular
 
@@ -387,11 +388,18 @@ class WitnessCam(QtCore.QObject):
 
         # Change phase to scanning mode
         self.phase = WitnessCam.SCANNING_MODE
+        # self.showCalibrationWindow()
 
         # Save the current view of the camera
         self.refreshCamera()
 
         self.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
+
+    def showCalibrationWindow(self):
+        self.wid = QtGui.QWidget()
+        self.wid.resize(250, 150)
+        self.wid.setWindowTitle('NewWindow')
+        self.wid.show()
 
     def floodFillBox(self, p, camera_mask, static_frame):
         """Given a grayscale image and a point, return a bounding box
