@@ -241,7 +241,7 @@ class WitnessCam(QtCore.QObject):
                 self.stableBoxRun = 0
                 self.stableBox = None
 
-            print(self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff, self.activeFrameSmoothDelta)
+            print("%d\t %d\t %f\t %f" % (self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff, self.activeFrameSmoothDelta))
 
             # If the frame has been stable for long enough, then
             if self.stableRun > WitnessCam.ACTION_DELAY and \
