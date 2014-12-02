@@ -1,4 +1,5 @@
 from PySide import QtCore, QtGui
+from functools import partial
 import numpy as np
 import cv2
 
@@ -34,7 +35,11 @@ class WitnessCam(QtCore.QObject):
         super(WitnessCam, self).__init__()
 
         self.logger = logger
+        self.mainWindow = None
         self.reset()
+
+    def setMainWindow(self, win):
+        self.mainWindow = win
 
     def reset(self):
         self.phase = WitnessCam.SELECT_POLYGON
@@ -46,6 +51,7 @@ class WitnessCam(QtCore.QObject):
         self.camBackground = None
         self.removedBug = -1
         self.currentSelectionBox = None
+        self.calibrate = None
 
         # Variables used to fin the removed bug
         self.activeFrameCurrentDiff = None
@@ -138,6 +144,11 @@ class WitnessCam(QtCore.QObject):
                 self.findCorrectBox(centroid, camera_frame_algo, static_frame, placed_boxes, dB)
 
             self.drawTrayArea(camera_frame_show, dS)
+            return (static_frame, camera_frame_show, placed_boxes)
+
+        elif self.phase == WitnessCam.CALIBRATION:
+            (camera_frame_algo, centroid) =\
+                self.getFrameDifferenceCentroid(camera_frame_algo)
             return (static_frame, camera_frame_algo, placed_boxes)
 
     def allowEditing(self):
@@ -241,10 +252,11 @@ class WitnessCam(QtCore.QObject):
                 self.stableBoxRun = 0
                 self.stableBox = None
 
-            print("%d\t %d\t %f\t %f" % (self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff, self.activeFrameSmoothDelta))
+            self.calibrate.updateValues(self.activeFrameCurrentDiff, self.activeFrameSmoothDelta)
 
             # If the frame has been stable for long enough, then
-            if self.stableRun > WitnessCam.ACTION_DELAY and \
+            if self.phase is not WitnessCam.CALIBRATION and \
+                    self.stableRun > WitnessCam.ACTION_DELAY and \
                     self.activeFrameCurrentDiff \
                     > WitnessCam.STABLE_FRAME_ACTION_THRESHOLD:
                 medpos = findWeightedMedianPoint2D(
@@ -276,24 +288,25 @@ class WitnessCam(QtCore.QObject):
         selected -- the colour of the selected box
         """
 
-        for i in range(len(boxes)):
+        if self.phase == WitnessCam.SCANNING_MODE:
+            for i in range(len(boxes)):
 
-            b = boxes[i].static
-            (px, py) = boxes[i].point
-            t = max(int(a/5), 1)
-            col = None
+                b = boxes[i].static
+                (px, py) = boxes[i].point
+                t = max(int(a/5), 1)
+                col = None
 
-            if i == self.removedBug:
-                col = active
-                ((_,h),_) = cv2.getTextSize(boxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
-                cv2.putText(image, boxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
-                cv2.rectangle(image, b[0:2], b[2:4], active, t)
-            else:
-                col = regular
+                if i == self.removedBug:
+                    col = active
+                    ((_,h),_) = cv2.getTextSize(boxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
+                    cv2.putText(image, boxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
+                    cv2.rectangle(image, b[0:2], b[2:4], active, t)
+                else:
+                    col = regular
 
-            cv2.line(image, (px, py-a), (px, py+a), col, t)
-            cv2.line(image, (px+a, py), (px-a, py), col, t)
-            cv2.circle(image, (px, py), a, col, t)
+                cv2.line(image, (px, py-a), (px, py+a), col, t)
+                cv2.line(image, (px+a, py), (px-a, py), col, t)
+                cv2.circle(image, (px, py), a, col, t)
 
     def findCorrectBox(self, live_pt, live_frame, static_frame, placed_boxes, big_draw):
         """Finds the correct place to create a box once an insect has been
@@ -386,20 +399,20 @@ class WitnessCam(QtCore.QObject):
 
         self.sigScanningModeOn.emit(True)
 
-        # Change phase to scanning mode
-        self.phase = WitnessCam.SCANNING_MODE
-        # self.showCalibrationWindow()
+        if self.calibrate is None:
+            self.phase = WitnessCam.CALIBRATION
+            self.showCalibrationWindow()
+            self.sigShowHint.emit(Hints.HINT_CALIBRATE)
+        else:
+            self.phase = WitnessCam.SCANNING_MODE
+            self.sigShowHint.emit(Hints.HINT_REMOVE_OR_EDIT)
 
         # Save the current view of the camera
         self.refreshCamera()
 
-        self.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
 
     def showCalibrationWindow(self):
-        self.wid = QtGui.QWidget()
-        self.wid.resize(250, 150)
-        self.wid.setWindowTitle('NewWindow')
-        self.wid.show()
+        self.calibrate = WitnessCam.CalibrationWindow(self)
 
     def floodFillBox(self, p, camera_mask, static_frame):
         """Given a grayscale image and a point, return a bounding box
@@ -477,11 +490,12 @@ class WitnessCam(QtCore.QObject):
     def refreshCamera(self):
         """Save the current camera view as the background, and reset some
         counters"""
-        if self.phase is WitnessCam.SCANNING_MODE:
+        if self.phase is WitnessCam.SCANNING_MODE or self.phase is WitnessCam.CALIBRATION:
             self.camBackground = np.copy(self.camera_image)
             self.camBackground = cv2.cvtColor(self.camBackground,
                                               cv2.cv.CV_BGR2Lab)
             self.stableRun = 0
+            self.stableRunBox = 0
 
     def setCurrentSelectionBox(self, boxes, i=-1):
         if boxes is not None and i != -1:
@@ -516,3 +530,103 @@ class WitnessCam(QtCore.QObject):
         else:
             return False
 
+    class CalibrationWindow(QtGui.QWidget):
+        def __init__(self, data, parent=None):
+            super(WitnessCam.CalibrationWindow, self).__init__(parent)
+            self.initUI()
+
+            self.calibrationStage = 0
+            self.data = data
+            self.diffValues = []
+            self.deltaValues = []
+
+        def initUI(self):
+            mainContent = QtGui.QGridLayout(self)
+
+            self.btnNext = QtGui.QPushButton('Make sure the camera is perfectly still, and has a clear view of the tray. \n\
+Then Click Here')
+
+            self.lblActDelay = QtGui.QLabel('ACTION_DELAY: ')
+            self.txtActDelayVal = QtGui.QLineEdit(str(WitnessCam.ACTION_DELAY))
+            self.txtActDelayVal.setValidator(QtGui.QIntValidator())
+            self.txtActDelayVal.setEnabled(False)
+
+            self.lblDelta = QtGui.QLabel('STABLE_FRAME_DELTA_THRESHOLD: ')
+            self.txtDeltaVal = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD))
+            self.txtDeltaVal.setValidator(QtGui.QDoubleValidator())
+            self.txtDeltaVal.setEnabled(False)
+
+            self.lblAction = QtGui.QLabel('STABLE_FRAME_ACTION_THRESHOLD: ')
+            self.txtActionVal = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD))
+            self.txtActionVal.setValidator(QtGui.QDoubleValidator())
+            self.txtActionVal.setEnabled(False)
+
+            mainContent.addWidget(self.lblActDelay, 1, 0)
+            mainContent.addWidget(self.txtActDelayVal, 1, 1)
+            mainContent.addWidget(self.lblDelta, 2, 0)
+            mainContent.addWidget(self.txtDeltaVal, 2, 1)
+            mainContent.addWidget(self.lblAction, 3, 0)
+            mainContent.addWidget(self.txtActionVal, 3, 1)
+            mainContent.addWidget(self.btnNext, 0, 0, 1, 2)
+
+            self.setLayout(mainContent)
+
+            self.btnNext.clicked.connect(self.nextStep)
+            self.txtActDelayVal.textChanged.connect(partial(self.textChanged, 0))
+            self.txtDeltaVal.textChanged.connect(partial(self.textChanged, 1))
+            self.txtActionVal.textChanged.connect(partial(self.textChanged, 2))
+
+            self.resize(250, 150)
+            self.setWindowTitle('Calibration')
+            self.show()
+
+        def closeEvent(self, event):
+            event.ignore()
+
+        def nextStep(self):
+            self.calibrationStage += 1
+            if self.calibrationStage == 1:
+                self.btnNext.setText('Wait about 5 seconds without disturbing the camera view,\nthen Click Here again.')
+                self.diffValues = []
+                self.deltaValues = []
+            elif self.calibrationStage == 2:
+                self.btnNext.setText('Remove any insect from the tray\nthen Click Here.')
+                self.delay = len(self.diffValues)/5
+                self.diff = sum(self.diffValues) / len(self.diffValues)
+                self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
+            elif self.calibrationStage == 3:
+                self.btnNext.setText('Wait about 5 seconds without disturbing the camera view,\nthen Click Here again.')
+                self.diffValues = []
+                self.deltaValues = []
+            elif self.calibrationStage == 4:
+                self.btnNext.setText('Replace the insect on the tray then\nClick Here.')
+                self.delay = len(self.diffValues)/5
+                self.diff = sum(self.diffValues) / len(self.diffValues)
+                self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
+                print(self.delay, self.diff/10, self.delta*20)
+                self.txtActDelayVal.setText(str(int(self.delay)))
+                self.txtDeltaVal.setText(str(self.delta*20))
+                self.txtActionVal.setText(str(self.diff/10))
+            elif self.calibrationStage == 5:
+                self.btnNext.setText('Calibration Done. Config values chosen.\nIf ever editing the below values, be sure all insects are on the tray')
+                self.data.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
+                self.data.phase = WitnessCam.SCANNING_MODE
+                self.data.refreshCamera()
+                self.btnNext.setEnabled(False)
+                self.txtActDelayVal.setEnabled(True)
+                self.txtDeltaVal.setEnabled(True)
+                self.txtActionVal.setEnabled(True)
+                self.data.mainWindow.raise_()
+
+        def updateValues(self, diff, delta):
+            self.diffValues.append(diff)
+            self.deltaValues.append(delta)
+
+        def textChanged(self, config, val):
+            self.data.refreshCamera()
+            if config == 0:
+                WitnessCam.ACTION_DELAY = int(val)
+            elif config == 1:
+                WitnessCam.STABLE_FRAME_DELTA_THRESHOLD = float(val)
+            elif config == 2:
+                WitnessCam.STABLE_FRAME_ACTION_THRESHOLD = float(val)

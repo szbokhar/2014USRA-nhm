@@ -7,3 +7,4 @@ HINT_REMOVEBUG = """Remove an insect from the tray and wait for it to be marked 
 HINT_ENTERBARCODE = "Scan the barcode for this insect"
 HINT_REPLACE_CONTINUE = """Once the barcode is entered correctly, replace the bug and remove the next one"""
 HINT_EDITBOX = """Drag box to move. Scroll to resize. Click X to delete. Click another marker to edit it. Remove insect to continue with scanning"""
+HINT_CALIBRATE = """Follow the directions on the Calibration window"""

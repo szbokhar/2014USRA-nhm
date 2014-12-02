@@ -18,6 +18,7 @@ class MainWindow(QtGui.QMainWindow):
     def __init__(self, cv_impl, logger):
         super(MainWindow, self).__init__()
         self.logger = logger
+        cv_impl.setMainWindow(self)
         self.initUI(cv_impl)
 
 
@@ -134,8 +135,8 @@ class MainWindow(QtGui.QMainWindow):
         self.logger.log('WINDOW resized to (%d, %d)' % (w,h), 1)
         (oldW, oldH) = self.originalSize
         scale = (float(w)/oldW, float(h)/oldH)
-        self.lblBig.newResizeScale(scale)
-        self.lblSmall.newResizeScale(scale)
+        # self.lblBig.newResizeScale(scale)
+        # self.lblSmall.newResizeScale(scale)
 
     def closeEvent(self, event):
         self.data.quit()
