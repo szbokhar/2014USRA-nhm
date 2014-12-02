@@ -248,7 +248,7 @@ class AppData(QtCore.QObject):
         if self.csvPath == None or self.csvPath == "":
             return True
 
-        ret = QtGui.QMessageBox.Discard
+        ret = QtGui.QMessageBox.Save
         message = QtGui.QMessageBox()
         if os.path.isfile(self.csvPath):
             message.setText('File %s already exists. Would you like to overwrite it?' % str(self.csvPath.split('/')[-1]))
@@ -256,7 +256,7 @@ class AppData(QtCore.QObject):
             message.setText('Would you like to save changes to %s?' % str(self.csvPath.split('/')[-1]))
 
         message.setStandardButtons(QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard | QtGui.QMessageBox.Cancel)
-        message.setDefaultButton(QtGui.QMessageBox.Discard)
+        message.setDefaultButton(QtGui.QMessageBox.Save)
         ret = message.exec_()
 
         if ret == QtGui.QMessageBox.Save:

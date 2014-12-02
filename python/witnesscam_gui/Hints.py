@@ -1,5 +1,5 @@
 HINT_LOADFILE = """Load a tray scan image by draggging a file here or using the file menu"""
-HINT_TRAYAREA_1 = """Click on the top right corner of the tray in the scanned image in the live camera view"""
+HINT_TRAYAREA_1 = """Click on the top left corner of the tray in the scanned image in the live camera view"""
 HINT_TRAYAREA_234 = "Now click on the next corner clockwise"
 HINT_TRAYAREA_BADPOINT = "Please place that point again. You cannot have two points at the same location."
 HINT_REMOVEBUG_OR_EDIT = """Remove an insect from the tray and wait for it to be marked with a blue circle, or click a green marker to edit"""
