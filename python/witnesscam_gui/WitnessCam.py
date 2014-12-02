@@ -590,7 +590,7 @@ Then Click Here')
                 self.diffValues = []
                 self.deltaValues = []
             elif self.calibrationStage == 2:
-                self.btnNext.setText('Remove any insect from the tray\nthen Click Here.')
+                self.btnNext.setText('Remove the smallest insect from the tray\nthen Click Here.')
                 self.delay = len(self.diffValues)/5
                 self.diff = sum(self.diffValues) / len(self.diffValues)
                 self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
