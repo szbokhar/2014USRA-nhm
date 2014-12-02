@@ -22,6 +22,7 @@ class AppData(QtCore.QObject):
 
     sigSelectedBox = QtCore.Signal(int)
     sigDeletedBox = QtCore.Signal(int)
+    sigCreatedBox = QtCore.Signal(int)
     sigTransformedBox = QtCore.Signal(int)
     sigShowHint = QtCore.Signal(str)
 
@@ -334,60 +335,69 @@ class AppData(QtCore.QObject):
 
         (mx, my) = self.bigMPos
         c = 15
+        a = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
 
-        if self.selectedEditBox is not None:
-            # If a box is selected, check for clicking on an editable point
-            # (e. corners for resizing, center for panning)
-            p = self.bigMPos
-            (x1, y1, x2, y2) = self.placedBoxes[self.selectedEditBox].static
-            a = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
-            if ev.button() == QtCore.Qt.MouseButton.LeftButton:
-                # Process left click
-                if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
-                    self.placedBoxes.delete(self.selectedEditBox)
-                    self.selectedEditBox = None
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+            if self.selectedEditBox is not None:
+                # If a box is selected, check for clicking on an editable point
+                # (e. corners for resizing, center for panning)
+                p = self.bigMPos
+                (x1, y1, x2, y2) = self.placedBoxes[self.selectedEditBox].static
+                if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+                    # Process left click
+                    if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
+                        self.placedBoxes.delete(self.selectedEditBox)
+                        self.selectedEditBox = None
 
-                    self.sigDeletedBox.emit(self.selectedEditBox)
-                    self.controlPanel.setCurrentBugId('')
-                elif pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
-                    self.editAction = AppData.DG_NW
-                elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
-                    self.editAction = AppData.DG_SE
-                elif pointInBox(p, (x1-c, y2-c, x1+c, y2+c)):
-                    self.editAction = AppData.DG_SW
-                elif pointInBox(p, (x2-c, y1-c, x2+c, y1+c)):
-                    self.editAction = AppData.DG_NE
-                elif pointInBox(p, (x1+c, y1-c, x2-c, y1+c)):
-                    self.editAction = AppData.DG_N
-                elif pointInBox(p, (x1+c, y2-c, x2-c, y2+c)):
-                    self.editAction = AppData.DG_S
-                elif pointInBox(p, (x1-c, y1+c, x1+c, y2-c)):
-                    self.editAction = AppData.DG_W
-                elif pointInBox(p, (x2-c, y1+c, x2+c, y2-c)):
-                    self.editAction = AppData.DG_E
-                elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
-                    self.editAction = AppData.PAN
+                        self.sigDeletedBox.emit(self.selectedEditBox)
+                        self.controlPanel.setCurrentBugId('')
+                    elif pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
+                        self.editAction = AppData.DG_NW
+                    elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
+                        self.editAction = AppData.DG_SE
+                    elif pointInBox(p, (x1-c, y2-c, x1+c, y2+c)):
+                        self.editAction = AppData.DG_SW
+                    elif pointInBox(p, (x2-c, y1-c, x2+c, y1+c)):
+                        self.editAction = AppData.DG_NE
+                    elif pointInBox(p, (x1+c, y1-c, x2-c, y1+c)):
+                        self.editAction = AppData.DG_N
+                    elif pointInBox(p, (x1+c, y2-c, x2-c, y2+c)):
+                        self.editAction = AppData.DG_S
+                    elif pointInBox(p, (x1-c, y1+c, x1+c, y2-c)):
+                        self.editAction = AppData.DG_W
+                    elif pointInBox(p, (x2-c, y1+c, x2+c, y2-c)):
+                        self.editAction = AppData.DG_E
+                    elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
+                        self.editAction = AppData.PAN
 
-                if self.editAction != AppData.NO_ACTION:
-                    return
+                    if self.editAction != AppData.NO_ACTION:
+                        return
 
-        # If a box is not selected, check for clicking on a box to
-        # to select it
-        clickedOn = False
-        for i in range(len(self.placedBoxes)):
-            (x1, y1, x2, y2) = self.placedBoxes[i].static
-            if pointInBox((mx, my), (x1-c, y1-c, x2+c, y2+c)):
-                self.sigSelectedBox.emit(i)
-                clickedOn = True
-                self.selectedEditBox = i
-                self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
-                self.sigShowHint.emit(Hints.HINT_EDITBOX)
+            # If a box is not selected, check for clicking on a box to
+            # to select it
+            clickedOn = False
+            for i in range(len(self.placedBoxes)):
+                (x1, y1, x2, y2) = self.placedBoxes[i].static
+                if pointInBox((mx, my), (x1-c, y1-c, x2+c, y2+c)):
+                    self.sigSelectedBox.emit(i)
+                    clickedOn = True
+                    self.selectedEditBox = i
+                    self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+                    self.sigShowHint.emit(Hints.HINT_EDITBOX)
 
-        # Check for deselect of box
-        if not clickedOn:
-            self.selectedEditBox = None
-            self.sigShowHint.emit(Hints.HINT_REMOVEBUG)
-            self.controlPanel.setCurrentBugId('')
+            # Check for deselect of box
+            if not clickedOn:
+                self.selectedEditBox = None
+                self.sigShowHint.emit(Hints.HINT_REMOVEBUG)
+                self.controlPanel.setCurrentBugId('')
+        else:
+            box = BugBox("Box " + str(len(self.placedBoxes)),
+                         None,
+                         (mx-3*a, my-3*a, mx+3*a, my+3*a),
+                         (mx, my))
+            self.placedBoxes.newBox(box)
+            self.selectedEditBox = len(self.placedBoxes) - 1
+            self.controlPanel.setCurrentBugId(self.placedBoxes[self.selectedEditBox].name)
 
     def editMouseMove(self):
         """Called when the application is in edit mode and the mouse is moved

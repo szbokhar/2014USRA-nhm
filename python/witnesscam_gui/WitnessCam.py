@@ -106,23 +106,25 @@ class WitnessCam(QtCore.QObject):
 
         elif self.phase == WitnessCam.SCANNING_MODE:
 
-            if self.rescalePlacedBoxes:
+            if self.rescalePlacedBoxes or placed_boxes.shouldRecomputeLiveBoxes():
                 for i in range(len(placed_boxes)):
-                    (x, y) = placed_boxes[i].point
-                    (x1, y1, x2, y2) = placed_boxes[i].static
+                    if self.rescalePlacedBoxes or placed_boxes.shouldRecomputeLiveBoxes(i):
+                        (x, y) = placed_boxes[i].point
+                        (x1, y1, x2, y2) = placed_boxes[i].static
 
-                    (h, w, _) = static_frame.shape
-                    p1 = square2poly(self.polygon_model, w, h, Pt(x1, y1))
-                    p2 = square2poly(self.polygon_model, w, h, Pt(x1, y2))
-                    p3 = square2poly(self.polygon_model, w, h, Pt(x2, y2))
-                    p4 = square2poly(self.polygon_model, w, h, Pt(x2, y1))
-                    x1 = min(p1.x, p2.x, p3.x, p4.x)
-                    x2 = max(p1.x, p2.x, p3.x, p4.x)
-                    y1 = min(p1.y, p2.y, p3.y, p4.y)
-                    y2 = max(p1.y, p2.y, p3.y, p4.y)
-                    placed_boxes[i].live = (x1, y1, x2, y2)
+                        (h, w, _) = static_frame.shape
+                        p1 = square2poly(self.polygon_model, w, h, Pt(x1, y1))
+                        p2 = square2poly(self.polygon_model, w, h, Pt(x1, y2))
+                        p3 = square2poly(self.polygon_model, w, h, Pt(x2, y2))
+                        p4 = square2poly(self.polygon_model, w, h, Pt(x2, y1))
+                        x1 = min(p1.x, p2.x, p3.x, p4.x)
+                        x2 = max(p1.x, p2.x, p3.x, p4.x)
+                        y1 = min(p1.y, p2.y, p3.y, p4.y)
+                        y2 = max(p1.y, p2.y, p3.y, p4.y)
+                        placed_boxes[i].live = (x1, y1, x2, y2)
 
             self.rescalePlacedBoxes = False
+            placed_boxes.recomputedLiveBoxes()
 
             # Check if an insect has been moved from/to the tray, and get its
             # position in the camera frame
@@ -478,6 +480,10 @@ class WitnessCam(QtCore.QObject):
 
         self.rescalePlacedBoxes = True
 
+        if self.calibrate is not None:
+            self.calibrate.exit()
+            self.calibrate = None
+
         self.sigShowHint.emit(Hints.HINT_TRAYAREA_1)
 
     def drawTrayArea(self, image, a):
@@ -623,7 +629,6 @@ Then Click Here')
                 self.delay = len(self.diffValues)/5
                 self.diff = sum(self.diffValues) / len(self.diffValues)
                 self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
-                print(self.delay, self.diff/10, self.delta*20)
                 self.txtActDelayVal.setText(str(int(self.delay)))
                 self.txtDelta.setText(str(self.delta*20))
                 self.txtAction.setText(str(self.diff/10))

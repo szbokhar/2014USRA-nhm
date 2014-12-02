@@ -307,6 +307,7 @@ class BugBoxList:
             self.static = static
             self.live = live
             self.point = point
+            self.recomputeLiveBoxes = False
 
         @staticmethod
         def newBox(i):
@@ -349,6 +350,17 @@ class BugBoxList:
     def newBox(self, box):
         self.recordAction(BugBoxList.Action.newBox(len(self.boxes)), self.undoStack)
         self.boxes.append(box)
+        if box.live is None:
+            self.recomputeLiveBoxes = True
+
+    def shouldRecomputeLiveBoxes(self, i=None):
+        if i is None:
+            return self.recomputeLiveBoxes
+        elif i < len(self.boxes):
+            return self.boxes[i].live is None
+
+    def recomputedLiveBoxes(self):
+        self.recomputeLiveBoxes = False
 
     def __getitem__(self, index):
         return self.boxes[index]
