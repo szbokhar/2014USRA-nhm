@@ -228,9 +228,9 @@ class AppData(QtCore.QObject):
 
             if i == self.selectedEditBox:
                 cv2.rectangle(image, b[0:2], b[2:4], selected, t)
-                cv2.rectangle(image, (b[2]+a, b[1]-3*a), (b[2]+3*a, b[1]-a), selected, t)
-                cv2.line(image, (b[2]+a, b[1]-3*a), (b[2]+3*a, b[1]-a), selected, t)
-                cv2.line(image, (b[2]+3*a, b[1]-3*a), (b[2]+a, b[1]-a), selected, t)
+                cv2.rectangle(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a), selected, t)
+                cv2.line(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a), selected, t)
+                cv2.line(image, (b[2]-3*a, b[1]+3*a), (b[2]-a, b[1]+a), selected, t)
                 ((_,h),_) = cv2.getTextSize(self.placedBoxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
                 cv2.putText(image, self.placedBoxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
                 col = selected
@@ -343,7 +343,13 @@ class AppData(QtCore.QObject):
             a = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
             if ev.button() == QtCore.Qt.MouseButton.LeftButton:
                 # Process left click
-                if pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
+                if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
+                    self.placedBoxes.delete(self.selectedEditBox)
+                    self.selectedEditBox = None
+
+                    self.sigDeletedBox.emit(self.selectedEditBox)
+                    self.controlPanel.setCurrentBugId('')
+                elif pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
                     self.editAction = AppData.DG_NW
                 elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
                     self.editAction = AppData.DG_SE
@@ -361,12 +367,6 @@ class AppData(QtCore.QObject):
                     self.editAction = AppData.DG_E
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.editAction = AppData.PAN
-                elif pointInBox(p, (x2+a, y1-3*a, x2+3*a, y1-a)):
-                    self.placedBoxes.delete(self.selectedEditBox)
-                    self.selectedEditBox = None
-
-                    self.sigDeletedBox.emit(self.selectedEditBox)
-                    self.controlPanel.setCurrentBugId('')
 
                 if self.editAction != AppData.NO_ACTION:
                     return
@@ -408,7 +408,9 @@ class AppData(QtCore.QObject):
                 a = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
                 (x1, y1, x2, y2) =\
                     self.placedBoxes[self.selectedEditBox].static
-                if pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
+                if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
+                    self.lblBig.setCursor(self.deleteCursor)
+                elif pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
                     self.lblBig.setCursor(self.resizeCursorF)
                 elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
                     self.lblBig.setCursor(self.resizeCursorF)
@@ -426,8 +428,6 @@ class AppData(QtCore.QObject):
                     self.lblBig.setCursor(self.resizeCursorH)
                 elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
                     self.lblBig.setCursor(self.prepanCursor)
-                elif pointInBox(p, (x2+a, y1-3*a, x2+3*a, y1-a)):
-                    self.lblBig.setCursor(self.deleteCursor)
             else:
                 (dx, dy) = (self.bigMPos[0] - self.bigMLastPos[0],
                             self.bigMPos[1] - self.bigMLastPos[1])
