@@ -52,6 +52,7 @@ class WitnessCam(QtCore.QObject):
         self.activeFrameLastDiff = None
         self.activeFrameSmoothDelta = None
         self.stableRun = 0
+        self.stableBoxRun = 0
         self.stableAverage = 0
         self.lastStableAverage = 0
         self.lastMedpos = None
@@ -137,7 +138,7 @@ class WitnessCam(QtCore.QObject):
                 self.findCorrectBox(centroid, camera_frame_algo, static_frame, placed_boxes, dB)
 
             self.drawTrayArea(camera_frame_show, dS)
-            return (static_frame, camera_frame_show, placed_boxes)
+            return (static_frame, camera_frame_algo, placed_boxes)
 
     def allowEditing(self):
         return self.phase == WitnessCam.SCANNING_MODE
@@ -239,6 +240,8 @@ class WitnessCam(QtCore.QObject):
                 self.stableRun = 0
                 self.stableBoxRun = 0
                 self.stableBox = None
+
+            print(self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff, self.activeFrameSmoothDelta)
 
             # If the frame has been stable for long enough, then
             if self.stableRun > WitnessCam.ACTION_DELAY and \
