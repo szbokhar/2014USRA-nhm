@@ -1,4 +1,6 @@
 from PySide import QtCore, QtGui
+from os import listdir
+from mimetypes import guess_type
 import cv2
 import numpy as np
 
@@ -51,6 +53,103 @@ class ControlPanel(QtGui.QFrame):
         self.txtBarcode.setText(string)
         self.txtBarcode.selectAll()
         self.txtBarcode.setFocus(QtCore.Qt.OtherFocusReason)
+
+class FileBrowser(QtGui.QFrame):
+
+    sigFileSelected = QtCore.Signal(str)
+
+    def __init__(self, parent=None):
+        super(FileBrowser, self).__init__(parent)
+        self.initUI()
+
+        self.currentItem = None
+        self.currentPath = None
+        self.imageFilename = None
+
+    def initUI(self):
+        panelLayout = QtGui.QVBoxLayout(self)
+        self.setLayout(panelLayout)
+
+        bottomPanel = QtGui.QFrame(self)
+        bottomLayout = QtGui.QHBoxLayout(self)
+        bottomPanel.setLayout(bottomLayout)
+
+        self.treeFileBrowser = QtGui.QTreeWidget(self)
+        self.treeFileBrowser.setHeaderItem(QtGui.QTreeWidgetItem(['Filename','# Bugs']))
+        self.btnNext = QtGui.QPushButton('>>')
+        self.btnNext.setEnabled(False)
+        self.btnPrevious = QtGui.QPushButton('<<')
+        self.btnPrevious.setEnabled(False)
+
+        bottomLayout.addStretch(1)
+        bottomLayout.addWidget(self.btnPrevious)
+        bottomLayout.addStretch(1)
+        bottomLayout.addWidget(self.btnNext)
+        bottomLayout.addStretch(1)
+        panelLayout.addWidget(self.treeFileBrowser)
+        panelLayout.addWidget(bottomPanel)
+
+        self.treeFileBrowser.itemDoubleClicked.connect(self.doubleClicked)
+        self.btnNext.clicked.connect(self.nextClicked)
+        self.btnPrevious.clicked.connect(self.previousClicked)
+
+    def refresh(self, currentPath, imageFilename):
+        self.currentPath = currentPath
+        self.imageFilename = imageFilename
+
+        images = [(f, guess_type(f)) for f in listdir(currentPath) if os.path.isfile(f)]
+        images = [f for (f,(t,e)) in images if t is not None and len(t) > 5 and t[0:5] == 'image']
+
+        model = self.treeFileBrowser.model()
+        for _ in range(model.rowCount()):
+            model.removeRow(0)
+
+        for f in images:
+            csvfile = currentPath+"/"+changeExtension(f, 'csv')
+            count = 'n/a'
+
+            if os.path.isfile(csvfile):
+                count = 0
+                with open(csvfile) as data:
+                    reader = csv.reader(data)
+                    for i, l in enumerate(reader):
+                        pass
+                    count = i
+            count = str(count)
+
+            item = QtGui.QTreeWidgetItem([f, count])
+            self.treeFileBrowser.addTopLevelItem(item)
+            if f==imageFilename:
+                font = item.font(0)
+                font.setBold(True)
+                item.setFont(0, font)
+                item.setFont(1, font)
+                self.treeFileBrowser.setItemSelected(item, True)
+                self.currentItem = item
+
+        self.treeFileBrowser.resizeColumnToContents(0)
+        self.treeFileBrowser.resizeColumnToContents(1)
+
+        if self.treeFileBrowser.itemBelow(self.currentItem) is None:
+            self.btnNext.setEnabled(False)
+        else:
+            self.btnNext.setEnabled(True)
+        if self.treeFileBrowser.itemAbove(self.currentItem) is None:
+            self.btnPrevious.setEnabled(False)
+        else:
+            self.btnPrevious.setEnabled(True)
+
+    def doubleClicked(self, i, c):
+        if self.currentItem is not i:
+            self.sigFileSelected.emit("%s/%s" % (self.currentPath,i.text(0)))
+
+    def nextClicked(self):
+        i = self.treeFileBrowser.itemBelow(self.currentItem)
+        self.sigFileSelected.emit("%s/%s" % (self.currentPath,i.text(0)))
+
+    def previousClicked(self):
+        i = self.treeFileBrowser.itemAbove(self.currentItem)
+        self.sigFileSelected.emit("%s/%s" % (self.currentPath,i.text(0)))
 
 
 class BigLabel(QtGui.QLabel):

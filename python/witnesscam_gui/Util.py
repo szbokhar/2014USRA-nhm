@@ -253,6 +253,12 @@ def dedup_list(seq, idfun=None):
         result.append(i)
     return result
 
+def changeExtension(fname, ext):
+    csvfile = fname.split('.')
+    csvfile[1] = ext
+    csvfile = '.'.join(csvfile)
+    return csvfile
+
 class BugBox:
     def __init__(self, name, livebox, staticbox, pt):
         self.name = name
@@ -432,10 +438,13 @@ class BugBoxList:
         self.redoStack = []
 
 class InteractionLogger:
-    def __init__(self, filename=None):
+    DEBUG, INTERACTION = range(2)
+
+    def __init__(self, filename=None, logLevels=[0,1]):
         self.filename = filename
         self.loggingFile = None
         self.startTime = time()
+        self.logLevels = logLevels
 
     def start(self):
         if self.filename is not None:
@@ -445,6 +454,6 @@ class InteractionLogger:
         if self.loggingFile is not None:
             self.loggingFile.close()
 
-    def log(self, string):
-        if self.loggingFile is not None:
+    def log(self, string, level=0):
+        if self.loggingFile is not None and any(map(lambda x: x==level, self.logLevels)):
             self.loggingFile.write(str(time() - self.startTime) + " " + string + "\n")

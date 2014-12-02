@@ -1,5 +1,6 @@
 from PySide import QtCore, QtGui
 from functools import partial
+import csv
 
 from AppData import *
 from GUIParts import *
@@ -8,34 +9,39 @@ from Util import *
 
 class MainWindow(QtGui.QMainWindow):
 
-    originalSize = (864, 486)
+    originalSize = (964, 486)
     sigLoadTrayImage = QtCore.Signal(str, str)
     sigUndoAction = QtCore.Signal()
     sigRedoAction = QtCore.Signal()
     sigQuitAction = QtCore.Signal()
 
-    def __init__(self, cv_impl, fname=None):
+    def __init__(self, cv_impl, logger):
         super(MainWindow, self).__init__()
-        self.initUI(cv_impl, fname)
+        self.logger = logger
+        self.initUI(cv_impl)
 
 
-    def initUI(self, cv_impl, fname=None):
+    def initUI(self, cv_impl):
         # Setup main content area
         mainWidget = QtGui.QFrame(self)
-        mainContent = QtGui.QVBoxLayout(self)
+        interactionWidget = QtGui.QFrame(mainWidget)
+        mainContent = QtGui.QHBoxLayout(self)
+        interactionContent = QtGui.QVBoxLayout(self)
 
         # Setup Gui Elements
-        self.data = AppData(self, cv_impl, fname)
+        self.data = AppData(self, cv_impl, self.logger)
         self.controlPanel = ControlPanel(self.data)
         self.lblBig = BigLabel(self.data)
         self.lblSmall = SmallLabel(self.data)
         self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
         self.controlPanel.txtBarcode.installEventFilter(self)
+        self.fileBrowser = FileBrowser()
 
         self.lblHint = QtGui.QLabel('')
         self.lblHint.setAlignment(QtCore.Qt.AlignHCenter)
         self.lblHint.setWordWrap(True)
         self.lblHint.setFixedHeight(50)
+
 
         self.topPanel = QtGui.QFrame()
         self.topContent = QtGui.QHBoxLayout(self)
@@ -44,18 +50,21 @@ class MainWindow(QtGui.QMainWindow):
 
         # Add GUI elements to window
         mainWidget.setLayout(mainContent)
+        interactionWidget.setLayout(interactionContent)
         self.bottomPanel.setLayout(self.bottomContent)
         self.topPanel.setLayout(self.topContent)
         self.setCentralWidget(mainWidget)
 
-        mainContent.addWidget(self.topPanel)
-        mainContent.addWidget(self.lblHint)
-        mainContent.addWidget(self.bottomPanel)
+        interactionContent.addWidget(self.topPanel)
+        interactionContent.addWidget(self.lblHint)
+        interactionContent.addWidget(self.bottomPanel)
         self.topContent.addStretch(1)
         self.topContent.addWidget(self.lblBig)
         self.topContent.addStretch(1)
         self.bottomContent.addWidget(self.lblSmall)
         self.bottomContent.addWidget(self.controlPanel)
+        mainContent.addWidget(interactionWidget)
+        mainContent.addWidget(self.fileBrowser)
 
         # Setup menu bar
         self.buildMenubar(cv_impl)
@@ -75,6 +84,7 @@ class MainWindow(QtGui.QMainWindow):
         self.data.sigSelectedBox.connect(cv_impl.onEditBoxSelected)
         self.data.sigDeletedBox.connect(cv_impl.onEditBoxDeleted)
         self.data.sigShowHint.connect(self.lblHint.setText)
+        self.fileBrowser.sigFileSelected.connect(self.selectTrayImage)
 
         # Finish up window
         self.setAcceptDrops(True)
@@ -121,6 +131,7 @@ class MainWindow(QtGui.QMainWindow):
     def resizeEvent(self, ev):
         h = ev.size().height()
         w = ev.size().width()
+        self.logger.log('WINDOW resized to (%d, %d)' % (w,h), 1)
         (oldW, oldH) = self.originalSize
         scale = (float(w)/oldW, float(h)/oldH)
         self.lblBig.newResizeScale(scale)
@@ -135,14 +146,13 @@ class MainWindow(QtGui.QMainWindow):
                 self, "Open Specimin File", ".")
 
         if fname != "":
+            self.logger.log('LOAD by File menu', 1)
             fpath = fname.split("/")
             self.currentPath = "/".join(fpath[0:-1])
-            csvfile = fpath[-1].split('.')
-            csvfile[1] = "csv"
-            csvfile = '.'.join(csvfile)
+            csvfile = changeExtension(fpath[-1], 'csv')
             csvfile = self.currentPath+"/"+csvfile
+            self.imageFilename = fpath[-1]
             self.sigLoadTrayImage.emit(fname, csvfile)
-            print(fname)
 
             recent_files = []
             if os.path.isfile('.recentScans.dat'):
@@ -157,6 +167,7 @@ class MainWindow(QtGui.QMainWindow):
                 for f in recent_files:
                     recent_file.write(f+'\n')
 
+            self.fileBrowser.refresh(self.currentPath, self.imageFilename)
 
 
     def dragEnterEvent(self, ev):
@@ -171,11 +182,13 @@ class MainWindow(QtGui.QMainWindow):
         self.setCursor(self.normalCursor)
 
         if ev.mimeData().hasUrls():
+            self.logger.log('LOAD by drag and drop', 1)
             self.selectTrayImage(ev.mimeData().urls()[0].path())
 
     def eventFilter(self, obj, event):
         if obj == self.controlPanel.txtBarcode and event.type() == QtCore.QEvent.Type.ShortcutOverride:
             if event.matches(QtGui.QKeySequence.Undo) or\
                     event.matches(QtGui.QKeySequence.Redo):
+                self.logger.log('KEY capture undo/redo from txtBarcode', 1)
                 return True
         return QtGui.QMainWindow.eventFilter(self, obj, event)

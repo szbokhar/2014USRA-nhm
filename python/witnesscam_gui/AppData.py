@@ -35,7 +35,7 @@ class AppData(QtCore.QObject):
     CAM_MAX_HEIGHT = 480
 
 
-    def __init__(self, win, cv_impl, logfile=None):
+    def __init__(self, win, cv_impl, logger):
         """Initializes a bunch of member variables for use in later
         functions"""
 
@@ -43,6 +43,7 @@ class AppData(QtCore.QObject):
 
         self.window = win
         self.cv_impl = cv_impl
+        self.logger = logger
 
         # Labels for displaying images
         self.controlPanel = None
@@ -68,7 +69,8 @@ class AppData(QtCore.QObject):
         self.deleteCursor = QtGui.QCursor(QtCore.Qt.PointingHandCursor)
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
 
-        self.logger = InteractionLogger(logfile)
+        self.logger = logger
+        self.logger.log('INIT AppData', 0)
 
         self.reset()
 
@@ -94,6 +96,8 @@ class AppData(QtCore.QObject):
 
         # Show Hint
         self.sigShowHint.emit(Hints.HINT_LOADFILE)
+
+        self.logger.log('RESET AppData', 0)
 
     def setGuiElements(self, control, big, small):
         """Associate the elements of the gui with the application data.
@@ -122,8 +126,10 @@ class AppData(QtCore.QObject):
         Keyword Arguments:
         image_fname -- the string filepath of the tray scan image"""
 
-        # Export current csv if theer is one
-        self.exportToCSV()
+        # Export current csv if there is one
+        ret = self.exportToCSV()
+        if not ret:
+            return
 
         # Clear data
         self.reset()
@@ -132,6 +138,7 @@ class AppData(QtCore.QObject):
 
         # Load the image
         self.trayPath = image_fname
+        self.logger.log('LOAD image scan file %s' % self.trayPath, 1)
         self.trayImage = cv2.imread(self.trayPath, cv2.IMREAD_COLOR)
         self.csvPath = csv_fname
 
@@ -147,6 +154,7 @@ class AppData(QtCore.QObject):
                         self.placedBoxes.newBox(box)
 
                     self.window.statusBar().showMessage('Also loaded CSV file: ' + str(csv_fname.split('/')[-1]))
+                    self.logger.log('LOAD found corresponding csv file %s' % self.csvPath, 1)
                 else:
                     QtGui.QMessageBox.information(
                         self.window, 'Error Reading CSV',
@@ -169,6 +177,7 @@ class AppData(QtCore.QObject):
             self.frameTimer.timeout.connect(self.getNewCameraFrame)
             self.frameTimer.start(30)
             self.camOn = True
+            self.logger.log('INIT camera', 0)
 
     def getNewCameraFrame(self):
         """This function is called by the timer 30 times a second to fetch a new
@@ -237,16 +246,20 @@ class AppData(QtCore.QObject):
         """Called when the Export to CSV button is pressed"""
 
         if self.csvPath == None or self.csvPath == "":
-            return
+            return True
 
-        ret = QtGui.QMessageBox.Yes
+        ret = QtGui.QMessageBox.Discard
+        message = QtGui.QMessageBox()
         if os.path.isfile(self.csvPath):
-            ret = QtGui.QMessageBox.question(
-                self.window, 'Overwrite file',
-                'File ' + str(self.csvPath.split('/')[-1]) + ' already exists. Would you like \
-to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+            message.setText('File %s already exists. Would you like to overwrite it?' % str(self.csvPath.split('/')[-1]))
+        else:
+            message.setText('Would you like to save changes to %s?' % str(self.csvPath.split('/')[-1]))
 
-        if ret == QtGui.QMessageBox.Yes:
+        message.setStandardButtons(QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard | QtGui.QMessageBox.Cancel)
+        message.setDefaultButton(QtGui.QMessageBox.Discard)
+        ret = message.exec_()
+
+        if ret == QtGui.QMessageBox.Save:
             f = open(self.csvPath, 'w')
             f.write('Insect Id, Rectangle x1, y1, x2, y1, Point x, y\n')
             for b in self.placedBoxes:
@@ -254,6 +267,11 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
                         str(b.getStaticBox())[1:-1] + ', ' +
                         str(b.getPoint())[1:-1] + '\n')
             self.window.statusBar().showMessage('Saved data to ' + str(self.csvPath.split('/')[-1]))
+            return True
+        elif ret == QtGui.QMessageBox.Discard:
+            return True
+        elif ret == QtGui.QMessageBox.Cancel:
+            return False
 
     def bigLabelMousePress(self, ev, scale):
         """When the mouse is clicked on the big label.
@@ -485,8 +503,10 @@ to overwrite it?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
             self.placedBoxes.changeBox(self.selectedEditBox, name=bid)
 
     def quit(self):
-        self.exportToCSV()
-        QtCore.QCoreApplication.instance().quit()
+        self.logger.stop()
+        exit = self.exportToCSV()
+        if exit:
+            QtCore.QCoreApplication.instance().quit()
 
     def onBugRemoved(self, i):
         if i != -1:

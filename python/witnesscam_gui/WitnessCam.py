@@ -30,10 +30,10 @@ class WitnessCam(QtCore.QObject):
     STABLE_FRAME_DELTA_THRESHOLD = 0.4
     STABLE_FRAME_ACTION_THRESHOLD = 0.5
 
-    def __init__(self):
-
+    def __init__(self, logger):
         super(WitnessCam, self).__init__()
 
+        self.logger = logger
         self.reset()
 
     def reset(self):
@@ -57,6 +57,7 @@ class WitnessCam(QtCore.QObject):
         self.lastMedpos = None
 
         self.camera_image = None
+        self.logger.log('INIT WitnessCam class', 0)
 
     def amendFrame(self, camera_frame, static_frame, big_scale, small_scale,
                    placed_boxes):
