@@ -36,6 +36,7 @@ class WitnessCam(QtCore.QObject):
 
         self.logger = logger
         self.mainWindow = None
+        self.calibrate = None
         self.reset()
 
     def setMainWindow(self, win):
@@ -51,7 +52,9 @@ class WitnessCam(QtCore.QObject):
         self.camBackground = None
         self.removedBug = -1
         self.currentSelectionBox = None
-        self.calibrate = None
+        if self.calibrate is not None:
+            self.calibrate.exit()
+            self.calibrate = None
 
         # Variables used to fin the removed bug
         self.activeFrameCurrentDiff = None
@@ -252,7 +255,7 @@ class WitnessCam(QtCore.QObject):
                 self.stableBoxRun = 0
                 self.stableBox = None
 
-            self.calibrate.updateValues(self.activeFrameCurrentDiff, self.activeFrameSmoothDelta)
+            self.calibrate.updateValues(self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff, self.activeFrameSmoothDelta)
 
             # If the frame has been stable for long enough, then
             if self.phase is not WitnessCam.CALIBRATION and \
@@ -399,13 +402,9 @@ class WitnessCam(QtCore.QObject):
 
         self.sigScanningModeOn.emit(True)
 
-        if self.calibrate is None:
-            self.phase = WitnessCam.CALIBRATION
-            self.showCalibrationWindow()
-            self.sigShowHint.emit(Hints.HINT_CALIBRATE)
-        else:
-            self.phase = WitnessCam.SCANNING_MODE
-            self.sigShowHint.emit(Hints.HINT_REMOVE_OR_EDIT)
+        self.phase = WitnessCam.CALIBRATION
+        self.showCalibrationWindow()
+        self.sigShowHint.emit(Hints.HINT_CALIBRATE)
 
         # Save the current view of the camera
         self.refreshCamera()
@@ -539,6 +538,7 @@ class WitnessCam(QtCore.QObject):
             self.data = data
             self.diffValues = []
             self.deltaValues = []
+            self.closeable = False
 
         def initUI(self):
             mainContent = QtGui.QGridLayout(self)
@@ -552,36 +552,56 @@ Then Click Here')
             self.txtActDelayVal.setEnabled(False)
 
             self.lblDelta = QtGui.QLabel('STABLE_FRAME_DELTA_THRESHOLD: ')
-            self.txtDeltaVal = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD))
-            self.txtDeltaVal.setValidator(QtGui.QDoubleValidator())
-            self.txtDeltaVal.setEnabled(False)
+            self.txtDelta = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD))
+            self.txtDelta.setValidator(QtGui.QDoubleValidator())
+            self.txtDelta.setEnabled(False)
 
             self.lblAction = QtGui.QLabel('STABLE_FRAME_ACTION_THRESHOLD: ')
-            self.txtActionVal = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD))
-            self.txtActionVal.setValidator(QtGui.QDoubleValidator())
-            self.txtActionVal.setEnabled(False)
+            self.txtAction = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD))
+            self.txtAction.setValidator(QtGui.QDoubleValidator())
+            self.txtAction.setEnabled(False)
 
+            self.lblStableRun = QtGui.QLabel()
+            self.lblStableBoxRun = QtGui.QLabel()
+            self.lblDiffVal = QtGui.QLabel()
+            self.lblDeltaVal = QtGui.QLabel()
+
+            mainContent.addWidget(self.btnNext, 0, 0, 1, 2)
             mainContent.addWidget(self.lblActDelay, 1, 0)
             mainContent.addWidget(self.txtActDelayVal, 1, 1)
             mainContent.addWidget(self.lblDelta, 2, 0)
-            mainContent.addWidget(self.txtDeltaVal, 2, 1)
+            mainContent.addWidget(self.txtDelta, 2, 1)
             mainContent.addWidget(self.lblAction, 3, 0)
-            mainContent.addWidget(self.txtActionVal, 3, 1)
-            mainContent.addWidget(self.btnNext, 0, 0, 1, 2)
+            mainContent.addWidget(self.txtAction, 3, 1)
+            mainContent.addWidget(QtGui.QLabel('stableRun: '), 4, 0)
+            mainContent.addWidget(self.lblStableRun, 4, 1)
+            mainContent.addWidget(QtGui.QLabel('stableBoxRun: '), 5, 0)
+            mainContent.addWidget(self.lblStableBoxRun, 5, 1)
+            mainContent.addWidget(QtGui.QLabel('currentDiff: '), 6, 0)
+            mainContent.addWidget(self.lblDiffVal, 6, 1)
+            mainContent.addWidget(QtGui.QLabel('currentDelta: '), 7, 0)
+            mainContent.addWidget(self.lblDeltaVal, 7, 1)
 
             self.setLayout(mainContent)
 
             self.btnNext.clicked.connect(self.nextStep)
             self.txtActDelayVal.textChanged.connect(partial(self.textChanged, 0))
-            self.txtDeltaVal.textChanged.connect(partial(self.textChanged, 1))
-            self.txtActionVal.textChanged.connect(partial(self.textChanged, 2))
+            self.txtDelta.textChanged.connect(partial(self.textChanged, 1))
+            self.txtAction.textChanged.connect(partial(self.textChanged, 2))
 
             self.resize(250, 150)
             self.setWindowTitle('Calibration')
             self.show()
 
         def closeEvent(self, event):
-            event.ignore()
+            if not self.closeable:
+                event.ignore()
+            else:
+                event.accept()
+
+        def exit(self):
+            self.closeable = True
+            self.close()
 
         def nextStep(self):
             self.calibrationStage += 1
@@ -605,8 +625,8 @@ Then Click Here')
                 self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
                 print(self.delay, self.diff/10, self.delta*20)
                 self.txtActDelayVal.setText(str(int(self.delay)))
-                self.txtDeltaVal.setText(str(self.delta*20))
-                self.txtActionVal.setText(str(self.diff/10))
+                self.txtDelta.setText(str(self.delta*20))
+                self.txtAction.setText(str(self.diff/10))
             elif self.calibrationStage == 5:
                 self.btnNext.setText('Calibration Done. Config values chosen.\nIf ever editing the below values, be sure all insects are on the tray')
                 self.data.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
@@ -614,13 +634,18 @@ Then Click Here')
                 self.data.refreshCamera()
                 self.btnNext.setEnabled(False)
                 self.txtActDelayVal.setEnabled(True)
-                self.txtDeltaVal.setEnabled(True)
-                self.txtActionVal.setEnabled(True)
+                self.txtDelta.setEnabled(True)
+                self.txtAction.setEnabled(True)
+                self.setWindowTitle('Debug')
                 self.data.mainWindow.raise_()
 
-        def updateValues(self, diff, delta):
+        def updateValues(self, srun, sbrun, diff, delta):
             self.diffValues.append(diff)
             self.deltaValues.append(delta)
+            self.lblStableRun.setText(str(srun))
+            self.lblStableBoxRun.setText(str(sbrun))
+            self.lblDiffVal.setText(str(diff))
+            self.lblDeltaVal.setText(str(delta))
 
         def textChanged(self, config, val):
             self.data.refreshCamera()
