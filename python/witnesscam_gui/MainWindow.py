@@ -40,7 +40,6 @@ class MainWindow(QtGui.QMainWindow):
         cv_impl.setMainWindow(self)
         self.initUI(cv_impl)
 
-
     def initUI(self, cv_impl):
         # Setup main content area
         mainWidget = QtGui.QFrame(self)
@@ -61,7 +60,6 @@ class MainWindow(QtGui.QMainWindow):
         self.lblHint.setAlignment(QtCore.Qt.AlignHCenter)
         self.lblHint.setWordWrap(True)
         self.lblHint.setFixedHeight(50)
-
 
         self.topPanel = QtGui.QFrame()
         self.topContent = QtGui.QHBoxLayout(self)
@@ -97,7 +95,8 @@ class MainWindow(QtGui.QMainWindow):
         self.sigQuitAction.connect(self.data.quit)
         self.sigUndoAction.connect(self.data.undoAction)
         self.sigRedoAction.connect(self.data.redoAction)
-        cv_impl.sigScanningModeOn.connect(self.controlPanel.txtBarcode.setEnabled)
+        cv_impl.sigScanningModeOn.connect(
+            self.controlPanel.txtBarcode.setEnabled)
         cv_impl.sigScanningModeOn.connect(self.actResyncCamera.setEnabled)
         cv_impl.sigRemovedBug.connect(self.data.onBugRemoved)
         cv_impl.sigShowHint.connect(self.lblHint.setText)
@@ -119,27 +118,39 @@ class MainWindow(QtGui.QMainWindow):
 
         fileMenu = QtGui.QMenu(menubar)
         fileMenu.setTitle('File')
-        fileMenu.addAction('Open Tray Image', self.selectTrayImage).setShortcut(QtGui.QKeySequence.Open)
+        fileMenu.addAction(
+            'Open Tray Image',
+            self.selectTrayImage).setShortcut(QtGui.QKeySequence.Open)
 
         recentMenu = fileMenu.addMenu('Open Recent Tray Scans')
         if os.path.isfile('.recentScans.dat'):
             with open('.recentScans.dat', 'r') as recent_file:
                 for path in recent_file.readlines():
                     fname = path.split('/')[-1]
-                    recentMenu.addAction(fname, partial(self.selectTrayImage, path[0:-1]))
+                    recentMenu.addAction(
+                        fname, partial(self.selectTrayImage, path[0:-1]))
         fileMenu.addSeparator()
-        fileMenu.addAction('Export to CSV', self.data.exportToCSV).setShortcut(QtGui.QKeySequence.Save)
-        fileMenu.addAction('Quit', self.sigQuitAction.emit).setShortcut(QtGui.QKeySequence.Quit)
+        fileMenu.addAction(
+            'Export to CSV',
+            self.data.exportToCSV).setShortcut(QtGui.QKeySequence.Save)
+        fileMenu.addAction(
+            'Quit',
+            self.sigQuitAction.emit).setShortcut(QtGui.QKeySequence.Quit)
 
         editMenu = QtGui.QMenu(menubar)
         editMenu.setTitle(' Edit')
-        editMenu.addAction('Undo', self.sigUndoAction.emit).setShortcut(QtGui.QKeySequence.Undo)
-        editMenu.addAction('Redo', self.sigRedoAction.emit).setShortcut(QtGui.QKeySequence.Redo)
+        editMenu.addAction(
+            'Undo',
+            self.sigUndoAction.emit).setShortcut(QtGui.QKeySequence.Undo)
+        editMenu.addAction(
+            'Redo',
+            self.sigRedoAction.emit).setShortcut(QtGui.QKeySequence.Redo)
 
         imageMenu = QtGui.QMenu(menubar)
         imageMenu.setTitle('Image')
         imageMenu.addAction('Retrace tray area', cv_impl.resetTrayArea)
-        self.actResyncCamera = imageMenu.addAction('Resync Camera', cv_impl.refreshCamera)
+        self.actResyncCamera = imageMenu.addAction(
+            'Resync Camera', cv_impl.refreshCamera)
         self.actResyncCamera.setDisabled(True)
 
         menubar.addMenu(fileMenu)
@@ -151,7 +162,7 @@ class MainWindow(QtGui.QMainWindow):
     def resizeEvent(self, ev):
         h = ev.size().height()
         w = ev.size().width()
-        self.logger.log('WINDOW resized to (%d, %d)' % (w,h), 1)
+        self.logger.log('WINDOW resized to (%d, %d)' % (w, h), 1)
         (oldW, oldH) = self.originalSize
         scale = (float(w)/oldW, float(h)/oldH)
         # self.lblBig.newResizeScale(scale)
@@ -189,7 +200,6 @@ class MainWindow(QtGui.QMainWindow):
 
             self.fileBrowser.refresh(self.currentPath, self.imageFilename)
 
-
     def dragEnterEvent(self, ev):
         if ev.mimeData().hasUrls():
             ev.accept()
@@ -206,7 +216,8 @@ class MainWindow(QtGui.QMainWindow):
             self.selectTrayImage(ev.mimeData().urls()[0].path())
 
     def eventFilter(self, obj, event):
-        if obj == self.controlPanel.txtBarcode and event.type() == QtCore.QEvent.Type.ShortcutOverride:
+        if obj == self.controlPanel.txtBarcode\
+                and event.type() == QtCore.QEvent.Type.ShortcutOverride:
             if event.matches(QtGui.QKeySequence.Undo) or\
                     event.matches(QtGui.QKeySequence.Redo):
                 self.logger.log('KEY capture undo/redo from txtBarcode', 1)

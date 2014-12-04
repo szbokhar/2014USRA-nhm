@@ -73,6 +73,7 @@ class ControlPanel(QtGui.QFrame):
         self.txtBarcode.selectAll()
         self.txtBarcode.setFocus(QtCore.Qt.OtherFocusReason)
 
+
 class FileBrowser(QtGui.QFrame):
 
     sigFileSelected = QtCore.Signal(str)
@@ -94,7 +95,8 @@ class FileBrowser(QtGui.QFrame):
         bottomPanel.setLayout(bottomLayout)
 
         self.treeFileBrowser = QtGui.QTreeWidget(self)
-        self.treeFileBrowser.setHeaderItem(QtGui.QTreeWidgetItem(['Filename','# Bugs']))
+        self.treeFileBrowser.setHeaderItem(
+            QtGui.QTreeWidgetItem(['Filename', '# Bugs']))
         self.btnNext = QtGui.QPushButton('>>')
         self.btnNext.setEnabled(False)
         self.btnPrevious = QtGui.QPushButton('<<')
@@ -116,8 +118,12 @@ class FileBrowser(QtGui.QFrame):
         self.currentPath = currentPath
         self.imageFilename = imageFilename
 
-        images = [(f, guess_type(f)) for f in listdir(currentPath) if os.path.isfile(f)]
-        images = [f for (f,(t,e)) in images if t is not None and len(t) > 5 and t[0:5] == 'image']
+        images = [(f, guess_type(f))
+                  for f in listdir(currentPath)
+                  if os.path.isfile(f)]
+        images = [f
+                  for (f, (t, e)) in images
+                  if t is not None and len(t) > 5 and t[0:5] == 'image']
 
         model = self.treeFileBrowser.model()
         for _ in range(model.rowCount()):
@@ -138,7 +144,7 @@ class FileBrowser(QtGui.QFrame):
 
             item = QtGui.QTreeWidgetItem([f, count])
             self.treeFileBrowser.addTopLevelItem(item)
-            if f==imageFilename:
+            if f == imageFilename:
                 font = item.font(0)
                 font.setBold(True)
                 item.setFont(0, font)
@@ -160,15 +166,15 @@ class FileBrowser(QtGui.QFrame):
 
     def doubleClicked(self, i, c):
         if self.currentItem is not i:
-            self.sigFileSelected.emit("%s/%s" % (self.currentPath,i.text(0)))
+            self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
 
     def nextClicked(self):
         i = self.treeFileBrowser.itemBelow(self.currentItem)
-        self.sigFileSelected.emit("%s/%s" % (self.currentPath,i.text(0)))
+        self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
 
     def previousClicked(self):
         i = self.treeFileBrowser.itemAbove(self.currentItem)
-        self.sigFileSelected.emit("%s/%s" % (self.currentPath,i.text(0)))
+        self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
 
 
 class BigLabel(QtGui.QLabel):
@@ -189,7 +195,8 @@ class BigLabel(QtGui.QLabel):
         self.initUI()
         self.setMouseTracking(True)
         self.imageScaleRatio = 1
-        # self.setPixmap(QtGui.QPixmap(self.originalSize[0], self.originalSize[1]))
+        # self.setPixmap(QtGui.QPixmap(self.originalSize[0],
+        #                              self.originalSize[1]))
         self.generateInitialImage()
 
     def initUI(self):
@@ -201,7 +208,8 @@ class BigLabel(QtGui.QLabel):
         else:
             cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2BGRA)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
-        (w, h, rat) = computeImageScaleFactor(originalSize, self.getCurrentSize())
+        (w, h, rat) = computeImageScaleFactor(
+            originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
         cvImage = cv2.resize(cvImage, (w, h))
         img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
@@ -233,25 +241,27 @@ class BigLabel(QtGui.QLabel):
         return (w*sx, h*sy)
 
     def generateInitialImage(self):
-        (w,h) = self.originalSize
+        (w, h) = self.originalSize
         img = np.zeros((h, w, 4), np.uint8)
 
         b = 4*h/10
         for text in ['Drag and Drop tray scan image file here',
                      'or load it from the File menu']:
-            ((tw,th), _) = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 1)
-            cv2.putText(img, text, ((w-tw)/2, b), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0,255), 2)
+            ((tw, th), _) = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX,
+                                            0.8, 1)
+            cv2.putText(img, text, ((w-tw)/2, b), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8, (0, 0, 0, 255), 2)
             b += th + 10
-        cv2.GaussianBlur(img, (3,3), 0.5, img)
+        cv2.GaussianBlur(img, (3, 3), 0.5, img)
 
         s = w/(2*20+1)
-        for i in range(0,w+100,s)[0::2]:
-            cv2.rectangle(img, (i,0), (i+s, 2), (0,0,0,128), -1)
-            cv2.rectangle(img, (i,h-1), (i+s, h-3), (0,0,0,128), -1)
+        for i in range(0, w+100, s)[0::2]:
+            cv2.rectangle(img, (i, 0), (i+s, 2), (0, 0, 0, 128), -1)
+            cv2.rectangle(img, (i, h-1), (i+s, h-3), (0, 0, 0, 128), -1)
         s = h/(2*10+1)
-        for i in range(0,h+100,s)[0::2]:
-            cv2.rectangle(img, (0,i), (2,i+s), (0,0,0,128), -1)
-            cv2.rectangle(img, (w-1,i), (w-3,i+s), (0,0,0,128), -1)
+        for i in range(0, h+100, s)[0::2]:
+            cv2.rectangle(img, (0, i), (2, i+s), (0, 0, 0, 128), -1)
+            cv2.rectangle(img, (w-1, i), (w-3, i+s), (0, 0, 0, 128), -1)
         self.setImage(img)
 
 
@@ -267,7 +277,8 @@ class SmallLabel(QtGui.QLabel):
         self.data = data
         self.initUI()
         self.imageScaleRatio = 1
-        # self.setPixmap(QtGui.QPixmap(self.originalSize[0], self.originalSize[1]))
+        # self.setPixmap(QtGui.QPixmap(self.originalSize[0],
+        #                              self.originalSize[1]))
         self.generateInitialImage()
 
     def initUI(self):
@@ -279,7 +290,8 @@ class SmallLabel(QtGui.QLabel):
         else:
             cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2BGRA)
         originalSize = (cvImage.shape[1], cvImage.shape[0])
-        (w, h, rat) = computeImageScaleFactor(originalSize, self.getCurrentSize())
+        (w, h, rat) = computeImageScaleFactor(
+            originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
         cvImage = cv2.resize(cvImage, (w, h))
         img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
@@ -299,7 +311,7 @@ class SmallLabel(QtGui.QLabel):
         return (w*sx, h*sy)
 
     def generateInitialImage(self):
-        (w,h) = self.originalSize
+        (w, h) = self.originalSize
         img = np.zeros((h, w, 4), np.uint8)
-        img[:,:,:] = [128,128,128,128]
+        img[:, :, :] = [128, 128, 128, 128]
         self.setImage(img)

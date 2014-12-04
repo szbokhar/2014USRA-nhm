@@ -32,6 +32,7 @@ RED = (0, 0, 255)
 WHITE = (255, 255, 255)
 CYAN = (255, 255, 0)
 
+
 class WitnessCam(QtCore.QObject):
 
     sigScanningModeOn = QtCore.Signal(bool)
@@ -114,8 +115,10 @@ class WitnessCam(QtCore.QObject):
 
         if self.phase == WitnessCam.SELECT_POLYGON:
             # Draw the cursor on the image
-            cv2.line(camera_frame_show, (mx-dB, my), (mx+dB, my), BLUE, max(int(dB/5), 1))
-            cv2.line(camera_frame_show, (mx, my-dB), (mx, my+dB), BLUE, max(int(dB/5), 1))
+            cv2.line(camera_frame_show, (mx-dB, my), (mx+dB, my),
+                     BLUE, max(int(dB/5), 1))
+            cv2.line(camera_frame_show, (mx, my-dB), (mx, my+dB),
+                     BLUE, max(int(dB/5), 1))
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
@@ -125,9 +128,11 @@ class WitnessCam(QtCore.QObject):
 
         elif self.phase == WitnessCam.SCANNING_MODE:
 
-            if self.rescalePlacedBoxes or placed_boxes.shouldRecomputeLiveBoxes():
+            if self.rescalePlacedBoxes\
+                    or placed_boxes.shouldRecomputeLiveBoxes():
                 for i in range(len(placed_boxes)):
-                    if self.rescalePlacedBoxes or placed_boxes.shouldRecomputeLiveBoxes(i):
+                    if self.rescalePlacedBoxes\
+                            or placed_boxes.shouldRecomputeLiveBoxes(i):
                         (x, y) = placed_boxes[i].point
                         (x1, y1, x2, y2) = placed_boxes[i].static
 
@@ -156,16 +161,19 @@ class WitnessCam(QtCore.QObject):
                 (trayHeight, trayWidth, _) = static_frame.shape
                 (u, v) = poly2square(self.polygon_model, trayWidth, trayHeight,
                                      centroid).t()
-                cv2.line(static_frame, (u-dB, v), (u+dB, v), RED, max(int(dB/5), 1))
-                cv2.line(static_frame, (u, v-dB), (u, v+dB), RED, max(int(dB/5), 1))
-
+                cv2.line(static_frame, (u-dB, v), (u+dB, v), RED,
+                         max(int(dB/5), 1))
+                cv2.line(static_frame, (u, v-dB), (u, v+dB), RED,
+                         max(int(dB/5), 1))
 
             # Draw all the boxes that have already been placed
-            self.drawPlacedBoxes(static_frame, placed_boxes, GREEN, RED, BLUE, dB)
+            self.drawPlacedBoxes(static_frame, placed_boxes, GREEN, RED, BLUE,
+                                 dB)
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= WitnessCam.ACTION_DELAY:
-                self.findCorrectBox(centroid, camera_frame_algo, static_frame, placed_boxes, dB)
+                self.findCorrectBox(centroid, camera_frame_algo, static_frame,
+                                    placed_boxes, dB)
 
             self.drawTrayArea(camera_frame_show, dS)
             return (static_frame, camera_frame_show, placed_boxes)
@@ -182,7 +190,7 @@ class WitnessCam(QtCore.QObject):
         if self.phase == WitnessCam.SELECT_POLYGON:
             point = Pt(int(ev.pos().x()/scale), int(ev.pos().y()/scale))
 
-            if any(map(lambda p: p==point, self.polyPoints)):
+            if any(map(lambda p: p == point, self.polyPoints)):
                 self.sigShowHint.emit(Hints.HINT_TRAYAREA_BADPOINT)
             else:
                 self.polyPoints.append(point)
@@ -276,7 +284,9 @@ class WitnessCam(QtCore.QObject):
                 self.stableBoxRun = 0
                 self.stableBox = None
 
-            self.calibrate.updateValues(self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff, self.activeFrameSmoothDelta)
+            self.calibrate.updateValues(
+                self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff,
+                self.activeFrameSmoothDelta)
 
             # If the frame has been stable for long enough, then
             if self.phase is not WitnessCam.CALIBRATION and \
@@ -322,8 +332,10 @@ class WitnessCam(QtCore.QObject):
 
                 if i == self.removedBug:
                     col = active
-                    ((_,h),_) = cv2.getTextSize(boxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
-                    cv2.putText(image, boxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
+                    ((_, h), _) = cv2.getTextSize(
+                        boxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
+                    cv2.putText(image, boxes[i].name, (b[0]-int(a/2), b[3]+h),
+                                cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
                     cv2.rectangle(image, b[0:2], b[2:4], active, t)
                 else:
                     col = regular
@@ -332,7 +344,8 @@ class WitnessCam(QtCore.QObject):
                 cv2.line(image, (px+a, py), (px-a, py), col, t)
                 cv2.circle(image, (px, py), a, col, t)
 
-    def findCorrectBox(self, live_pt, live_frame, static_frame, placed_boxes, big_draw):
+    def findCorrectBox(self, live_pt, live_frame, static_frame, placed_boxes,
+                       big_draw):
         """Finds the correct place to create a box once an insect has been
         removed from the draw, or selects an exsisting box.
 
@@ -343,7 +356,8 @@ class WitnessCam(QtCore.QObject):
 
         if live_pt is not None:
             # Generate a box on the camera image that contains the live point
-            (static_box, live_box) = self.floodFillBox(live_pt, live_frame, static_frame)
+            (static_box, live_box) =\
+                self.floodFillBox(live_pt, live_frame, static_frame)
 
             if static_box is not None:
                 (trayHeight, trayWidth, _) = static_frame.shape
@@ -397,7 +411,8 @@ class WitnessCam(QtCore.QObject):
                                      self.stableBox[0],
                                      self.stableBox[2])
                         placed_boxes.newBox(box)
-                        self.setCurrentSelectionBox(placed_boxes, len(placed_boxes)-1)
+                        self.setCurrentSelectionBox(
+                            placed_boxes, len(placed_boxes)-1)
                         self.refreshCamera()
                     else:
                         self.setCurrentSelectionBox(placed_boxes, i)
@@ -429,7 +444,6 @@ class WitnessCam(QtCore.QObject):
 
         # Save the current view of the camera
         self.refreshCamera()
-
 
     def showCalibrationWindow(self):
         self.calibrate = WitnessCam.CalibrationWindow(self)
@@ -485,7 +499,6 @@ class WitnessCam(QtCore.QObject):
 
         return (None, None)
 
-
     def resetTrayArea(self):
         self.phase = WitnessCam.SELECT_POLYGON
 
@@ -508,13 +521,14 @@ class WitnessCam(QtCore.QObject):
     def drawTrayArea(self, image, a):
         for i in range(len(self.polyPoints)):
             p1 = self.polyPoints[i].t()
-            p2 = self.polyPoints[(i+1)%len(self.polyPoints)].t()
+            p2 = self.polyPoints[(i+1) % len(self.polyPoints)].t()
             cv2.line(image, p1, p2, BLUE, max(a/5, 1))
 
     def refreshCamera(self):
         """Save the current camera view as the background, and reset some
         counters"""
-        if self.phase is WitnessCam.SCANNING_MODE or self.phase is WitnessCam.CALIBRATION:
+        if self.phase is WitnessCam.SCANNING_MODE\
+                or self.phase is WitnessCam.CALIBRATION:
             self.camBackground = np.copy(self.camera_image)
             self.camBackground = cv2.cvtColor(self.camBackground,
                                               cv2.cv.CV_BGR2Lab)
@@ -539,7 +553,8 @@ class WitnessCam(QtCore.QObject):
         self.refreshCamera()
 
     def undo(self):
-        if self.phase == WitnessCam.SELECT_POLYGON and len(self.polyPoints) > 0:
+        if self.phase == WitnessCam.SELECT_POLYGON\
+                and len(self.polyPoints) > 0:
             self.polyPointsRedo.append(self.polyPoints[-1])
             del self.polyPoints[-1]
             return True
@@ -547,7 +562,8 @@ class WitnessCam(QtCore.QObject):
             return False
 
     def redo(self):
-        if self.phase == WitnessCam.SELECT_POLYGON and len(self.polyPointsRedo) > 0:
+        if self.phase == WitnessCam.SELECT_POLYGON\
+                and len(self.polyPointsRedo) > 0:
             self.polyPoints.append(self.polyPointsRedo[-1])
             del self.polyPointsRedo[-1]
             return True
@@ -568,8 +584,7 @@ class WitnessCam(QtCore.QObject):
         def initUI(self):
             mainContent = QtGui.QGridLayout(self)
 
-            self.btnNext = QtGui.QPushButton('Make sure the camera is perfectly still, and has a clear view of the tray. \n\
-Then Click Here')
+            self.btnNext = QtGui.QPushButton(Hints.CALIBRATION_STAGE1)
 
             self.lblActDelay = QtGui.QLabel('ACTION_DELAY: ')
             self.txtActDelayVal = QtGui.QLineEdit(str(WitnessCam.ACTION_DELAY))
@@ -577,12 +592,14 @@ Then Click Here')
             self.txtActDelayVal.setEnabled(False)
 
             self.lblDelta = QtGui.QLabel('STABLE_FRAME_DELTA_THRESHOLD: ')
-            self.txtDelta = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD))
+            self.txtDelta = QtGui.QLineEdit(
+                str(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD))
             self.txtDelta.setValidator(QtGui.QDoubleValidator())
             self.txtDelta.setEnabled(False)
 
             self.lblAction = QtGui.QLabel('STABLE_FRAME_ACTION_THRESHOLD: ')
-            self.txtAction = QtGui.QLineEdit(str(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD))
+            self.txtAction = QtGui.QLineEdit(
+                str(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD))
             self.txtAction.setValidator(QtGui.QDoubleValidator())
             self.txtAction.setEnabled(False)
 
@@ -610,7 +627,8 @@ Then Click Here')
             self.setLayout(mainContent)
 
             self.btnNext.clicked.connect(self.nextStep)
-            self.txtActDelayVal.textChanged.connect(partial(self.textChanged, 0))
+            self.txtActDelayVal.textChanged.connect(
+                partial(self.textChanged, 0))
             self.txtDelta.textChanged.connect(partial(self.textChanged, 1))
             self.txtAction.textChanged.connect(partial(self.textChanged, 2))
 
@@ -631,28 +649,30 @@ Then Click Here')
         def nextStep(self):
             self.calibrationStage += 1
             if self.calibrationStage == 1:
-                self.btnNext.setText('Wait about 5 seconds without disturbing the camera view,\nthen Click Here again.')
+                self.btnNext.setText(Hints.CALIBRATION_STAGE2)
                 self.diffValues = []
                 self.deltaValues = []
             elif self.calibrationStage == 2:
-                self.btnNext.setText('Remove the smallest insect from the tray\nthen Click Here.')
+                self.btnNext.setText(Hints.CALIBRATION_STAGE3)
                 self.delay = len(self.diffValues)/5
                 self.diff = sum(self.diffValues) / len(self.diffValues)
-                self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
+                self.delta =\
+                    sum(map(abs, self.deltaValues)) / len(self.deltaValues)
             elif self.calibrationStage == 3:
-                self.btnNext.setText('Wait about 5 seconds without disturbing the camera view,\nthen Click Here again.')
+                self.btnNext.setText(Hints.CALIBRATION_STAGE4)
                 self.diffValues = []
                 self.deltaValues = []
             elif self.calibrationStage == 4:
-                self.btnNext.setText('Replace the insect on the tray then\nClick Here.')
+                self.btnNext.setText(Hints.CALIBRATION_STAGE5)
                 self.delay = len(self.diffValues)/5
                 self.diff = sum(self.diffValues) / len(self.diffValues)
-                self.delta = sum(map(abs, self.deltaValues)) / len(self.deltaValues)
+                self.delta =\
+                    sum(map(abs, self.deltaValues)) / len(self.deltaValues)
                 self.txtActDelayVal.setText(str(int(self.delay)))
                 self.txtDelta.setText(str(self.delta*20))
                 self.txtAction.setText(str(self.diff/10))
             elif self.calibrationStage == 5:
-                self.btnNext.setText('Calibration Done. Config values chosen.\nIf ever editing the below values, be sure all insects are on the tray')
+                self.btnNext.setText(Hints.CALIBRATION_STAGE6)
                 self.data.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
                 self.data.phase = WitnessCam.SCANNING_MODE
                 self.data.refreshCamera()

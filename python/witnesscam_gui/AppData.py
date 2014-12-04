@@ -54,7 +54,6 @@ class AppData(QtCore.QObject):
     CAM_MAX_WIDTH = 640
     CAM_MAX_HEIGHT = 480
 
-
     def __init__(self, win, cv_impl, logger):
         """Initializes a bunch of member variables for use in later
         functions"""
@@ -169,16 +168,22 @@ class AppData(QtCore.QObject):
                 self.placedBoxes = BugBoxList()
                 if (reader.next()[1] == ' Rectangle x1'):
                     for b in reader:
-                        box = BugBox(b[0], None, (int(b[1]), int(b[2]), int(b[3]),
-                                     int(b[4])), (int(b[5]), int(b[6])))
+                        box = BugBox(
+                            b[0], None,
+                            (int(b[1]), int(b[2]), int(b[3]), int(b[4])),
+                            (int(b[5]), int(b[6])))
                         self.placedBoxes.newBox(box)
 
-                    self.window.statusBar().showMessage('Also loaded CSV file: ' + str(csv_fname.split('/')[-1]))
-                    self.logger.log('LOAD found corresponding csv file %s' % self.csvPath, 1)
+                    self.window.statusBar().showMessage(
+                        'Also loaded CSV file: '
+                        + str(csv_fname.split('/')[-1]))
+                    self.logger.log(
+                        'LOAD found corresponding csv file %s'
+                        % self.csvPath, 1)
                 else:
                     QtGui.QMessageBox.information(
                         self.window, 'Error Reading CSV',
-                        'It seems the file ' + str(csv_fname.split('/')[-1]) +\
+                        'It seems the file ' + str(csv_fname.split('/')[-1]) +
                         ' id badly formatted. Cannot load.')
 
         # Start the camera loop
@@ -212,9 +217,9 @@ class AppData(QtCore.QObject):
 
         # Process and modify the camera and static frames
         (big_image, small_image, self.placedBoxes) =\
-            self.cv_impl.amendFrame(self.cameraImage, self.trayImage,
-            self.lblBig.imageScaleRatio, self.lblSmall.imageScaleRatio,
-            self.placedBoxes)
+            self.cv_impl.amendFrame(
+                self.cameraImage, self.trayImage, self.lblBig.imageScaleRatio,
+                self.lblSmall.imageScaleRatio, self.placedBoxes)
 
         if self.cv_impl.allowEditing():
             dB = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
@@ -248,11 +253,18 @@ class AppData(QtCore.QObject):
 
             if i == self.selectedEditBox:
                 cv2.rectangle(image, b[0:2], b[2:4], selected, t)
-                cv2.rectangle(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a), selected, t)
-                cv2.line(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a), selected, t)
-                cv2.line(image, (b[2]-3*a, b[1]+3*a), (b[2]-a, b[1]+a), selected, t)
-                ((_,h),_) = cv2.getTextSize(self.placedBoxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
-                cv2.putText(image, self.placedBoxes[i].name, (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
+                cv2.rectangle(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a),
+                              selected, t)
+                cv2.line(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a),
+                         selected, t)
+                cv2.line(image, (b[2]-3*a, b[1]+3*a), (b[2]-a, b[1]+a),
+                         selected, t)
+                ((_, h), _) = cv2.getTextSize(
+                    self.placedBoxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0,
+                    t)
+                cv2.putText(image, self.placedBoxes[i].name,
+                            (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX,
+                            a/18.0, WHITE, t)
                 col = selected
             else:
                 col = regular
@@ -265,17 +277,21 @@ class AppData(QtCore.QObject):
     def exportToCSV(self):
         """Called when the Export to CSV button is pressed"""
 
-        if self.csvPath == None or self.csvPath == "":
+        if self.csvPath is None or self.csvPath == "":
             return True
 
         ret = QtGui.QMessageBox.Save
         message = QtGui.QMessageBox()
         if os.path.isfile(self.csvPath):
-            message.setText('File %s already exists. Would you like to overwrite it?' % str(self.csvPath.split('/')[-1]))
+            message.setText(Hints.DIALOG_OVERWRITE
+                            % str(self.csvPath.split('/')[-1]))
         else:
-            message.setText('Would you like to save changes to %s?' % str(self.csvPath.split('/')[-1]))
+            message.setText(Hints.DIALOG_SAVE
+                            % str(self.csvPath.split('/')[-1]))
 
-        message.setStandardButtons(QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard | QtGui.QMessageBox.Cancel)
+        message.setStandardButtons(
+            QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard
+            | QtGui.QMessageBox.Cancel)
         message.setDefaultButton(QtGui.QMessageBox.Save)
         ret = message.exec_()
 
@@ -286,7 +302,8 @@ class AppData(QtCore.QObject):
                 f.write(b.name + ", " +
                         str(b.getStaticBox())[1:-1] + ', ' +
                         str(b.getPoint())[1:-1] + '\n')
-            self.window.statusBar().showMessage('Saved data to ' + str(self.csvPath.split('/')[-1]))
+            self.window.statusBar().showMessage(
+                'Saved data to ' + str(self.csvPath.split('/')[-1]))
             return True
         elif ret == QtGui.QMessageBox.Discard:
             return True
@@ -361,7 +378,8 @@ class AppData(QtCore.QObject):
                 # If a box is selected, check for clicking on an editable point
                 # (e. corners for resizing, center for panning)
                 p = self.bigMPos
-                (x1, y1, x2, y2) = self.placedBoxes[self.selectedEditBox].static
+                (x1, y1, x2, y2) =\
+                    self.placedBoxes[self.selectedEditBox].static
                 if ev.button() == QtCore.Qt.MouseButton.LeftButton:
                     # Process left click
                     if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
@@ -416,7 +434,8 @@ class AppData(QtCore.QObject):
                          (mx, my))
             self.placedBoxes.newBox(box)
             self.selectedEditBox = len(self.placedBoxes) - 1
-            self.controlPanel.setCurrentBugId(self.placedBoxes[self.selectedEditBox].name)
+            self.controlPanel.setCurrentBugId(
+                self.placedBoxes[self.selectedEditBox].name)
 
     def editMouseMove(self):
         """Called when the application is in edit mode and the mouse is moved
@@ -510,7 +529,8 @@ class AppData(QtCore.QObject):
     def editMouseScroll(self, ev):
         """Called when the application is in edit mode and the mouse is released
         on the big label."""
-        d = int(math.copysign(1, ev.delta())*math.sqrt(abs(ev.delta()))/self.lblBig.imageScaleRatio)
+        d = int(math.copysign(1, ev.delta())
+                * math.sqrt(abs(ev.delta()))/self.lblBig.imageScaleRatio)
         if abs(d) < 1:
             d = d/abs(d)
 
@@ -519,10 +539,12 @@ class AppData(QtCore.QObject):
             b = self.placedBoxes[self.selectedEditBox]
             (x1, y1, x2, y2) = b.static
             rat = (y2-y1)/float(x2-x1)
-            (x1, y1, x2, y2) = (x1-d, y1-int(d*rat), x2+d ,y2+int(d*rat))
-            (x1, y1, x2, y2) = (min(x1,x2), min(y1,y2), max(x1,x2), max(y1,y2))
+            (x1, y1, x2, y2) = (x1-d, y1-int(d*rat), x2+d, y2+int(d*rat))
+            (x1, y1, x2, y2) = (min(x1, x2), min(y1, y2),
+                                max(x1, x2), max(y1, y2))
             if abs(x1-x2) > 15 and abs(y1-y2) > 15:
-                self.placedBoxes.changeBox(self.selectedEditBox, static=(x1,y1,x2,y2))
+                self.placedBoxes.changeBox(
+                    self.selectedEditBox, static=(x1, y1, x2, y2))
 
     def newBugIdEntered(self, bid):
         if self.removedBug != -1:

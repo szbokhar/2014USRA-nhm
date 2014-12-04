@@ -260,23 +260,38 @@ def pointInBox(p, box):
 
     return x > x1 and x < x2 and y > y1 and y < y2
 
+
 def dedup_list(seq, idfun=None):
+    """Removes duplicates from a list, preserving the order of the first
+    non-uniqe elements
+
+    Keyword Arguments:
+    seq -- list of elements
+    idfun -- function that converts an element to a comparison space
+
+    Return: result
+    result -- the de-deuplicated list"""
     if idfun is None:
-        def idfun(x): return x
+        def idfun(x):
+            return x
+
     seen = {}
     result = []
     for i in seq:
         marker = idfun(i)
-        if marker in seen: continue
+        if marker in seen:
+            continue
         seen[marker] = 1
         result.append(i)
     return result
+
 
 def changeExtension(fname, ext):
     csvfile = fname.split('.')
     csvfile[1] = ext
     csvfile = '.'.join(csvfile)
     return csvfile
+
 
 class BugBox:
     def __init__(self, name, livebox, staticbox, pt):
@@ -304,12 +319,13 @@ class BugBox:
 
     def __eq__(s, o):
         try:
-            return s.name == o.name and\
-                   s.live == o.live and\
-                   s.static == o.static and\
-                   s.point == o.point
+            return s.name == o.name\
+                and s.live == o.live\
+                and s.static == o.static\
+                and s.point == o.point
         except AttributeError:
             return False
+
 
 class BugBoxList:
 
@@ -317,7 +333,8 @@ class BugBoxList:
         # Undoable actions
         CREATE_BOX, DELETE_BOX, TRANSFORM_BOX_FROM = range(3)
 
-        def __init__(self, kind, index=None, box=None, name=None, static=None, live=None, point=None):
+        def __init__(self, kind, index=None, box=None, name=None,
+                     static=None, live=None, point=None):
             self.ts = time()
             self.action = kind
             self.index = index
@@ -334,13 +351,14 @@ class BugBoxList:
 
         @staticmethod
         def deleteBox(index, box):
-            return BugBoxList.Action(BugBoxList.Action.DELETE_BOX, index=index, box=box)
+            return BugBoxList.Action(BugBoxList.Action.DELETE_BOX, index=index,
+                                     box=box)
 
         @staticmethod
         def changeBox(i, name=None, static=None, live=None, point=None):
-            return BugBoxList.Action(BugBoxList.Action.TRANSFORM_BOX_FROM,
-                          index=i, name=name, static=static, live=live,
-                          point=point)
+            return BugBoxList.Action(
+                BugBoxList.Action.TRANSFORM_BOX_FROM, index=i, name=name,
+                static=static, live=live, point=point)
 
         def __str__(self):
             return str(self.ts) + " " + str(self.action)
@@ -349,9 +367,9 @@ class BugBoxList:
             return str(self)
 
         def isSimilar(self, other):
-            return self.action is BugBoxList.Action.TRANSFORM_BOX_FROM and\
-                   other.action is BugBoxList.Action.TRANSFORM_BOX_FROM and\
-                   abs(self.ts - other.ts) < 1
+            return self.action is BugBoxList.Action.TRANSFORM_BOX_FROM\
+                and other.action is BugBoxList.Action.TRANSFORM_BOX_FROM\
+                and abs(self.ts - other.ts) < 1
 
         def merge(self, other):
             if self.isSimilar(other):
@@ -360,14 +378,14 @@ class BugBoxList:
             else:
                 return False
 
-
     def __init__(self):
         self.boxes = []
         self.undoStack = []
         self.redoStack = []
 
     def newBox(self, box):
-        self.recordAction(BugBoxList.Action.newBox(len(self.boxes)), self.undoStack)
+        self.recordAction(BugBoxList.Action.newBox(len(self.boxes)),
+                          self.undoStack)
         self.boxes.append(box)
         if box.live is None:
             self.recomputeLiveBoxes = True
@@ -392,16 +410,17 @@ class BugBoxList:
 
     def delete(self, index):
         box = self.boxes[index]
-        self.recordAction(BugBoxList.Action.deleteBox(index, box), self.undoStack)
+        self.recordAction(BugBoxList.Action.deleteBox(index, box),
+                          self.undoStack)
         del self.boxes[index]
 
     def changeBox(self, index, name=None, live=None, static=None, point=None):
         self.recordAction(BugBoxList.Action.changeBox(
             index,
-            name= self.boxes[index].name if name is not None else None,
-            static= self.boxes[index].static if static is not None else None,
-            live= self.boxes[index].live if live is not None else None,
-            point= self.boxes[index].point if point is not None else None),
+            name=self.boxes[index].name if name is not None else None,
+            static=self.boxes[index].static if static is not None else None,
+            live=self.boxes[index].live if live is not None else None,
+            point=self.boxes[index].point if point is not None else None),
             self.undoStack)
 
         if name is not None:
@@ -412,7 +431,6 @@ class BugBoxList:
             self.boxes[index].static = static
         if point is not None:
             self.boxes[index].point = point
-
 
     def recordAction(self, action, stack, clearRedo=True, allowMerge=True):
         if len(stack) == 0 or not allowMerge or not stack[-1].merge(action):
@@ -434,28 +452,30 @@ class BugBoxList:
         else:
             return None
 
-
         if act.action == BugBoxList.Action.CREATE_BOX:
-            self.recordAction(BugBoxList.Action.deleteBox(act.index, self.boxes[act.index]), stack2, False, False)
+            self.recordAction(BugBoxList.Action.deleteBox(
+                act.index, self.boxes[act.index]), stack2, False, False)
             del self.boxes[act.index]
             return -1
         elif act.action == BugBoxList.Action.DELETE_BOX:
-            self.recordAction(BugBoxList.Action.newBox(act.index), stack2, False, False)
+            self.recordAction(BugBoxList.Action.newBox(act.index),
+                              stack2, False, False)
             self.boxes.insert(act.index, act.box)
             return act.index
         elif act.action == BugBoxList.Action.TRANSFORM_BOX_FROM:
             i = act.index
+            box = self.boxes[i]
             self.recordAction(BugBoxList.Action.changeBox(
                 i,
-                name= self.boxes[i].name if act.name is not None else None,
-                static= self.boxes[i].static if act.static is not None else None,
-                live= self.boxes[i].live if act.live is not None else None,
-                point= self.boxes[i].point if act.point is not None else None),
+                name=box.name if act.name is not None else None,
+                static=box.static if act.static is not None else None,
+                live=box.live if act.live is not None else None,
+                point=box.point if act.point is not None else None),
                 stack2, False, False)
-            self.boxes[i].name = act.name if act.name is not None else self.boxes[i].name
-            self.boxes[i].static = act.static if act.static is not None else self.boxes[i].static
-            self.boxes[i].live = act.live if act.live is not None else self.boxes[i].live
-            self.boxes[i].point = act.point if act.point is not None else self.boxes[i].point
+            box.name = act.name if act.name is not None else box.name
+            box.static = act.static if act.static is not None else box.static
+            box.live = act.live if act.live is not None else box.live
+            box.point = act.point if act.point is not None else box.point
             return act.index if act.index is not None else -1
 
     def undo(self):
@@ -468,10 +488,11 @@ class BugBoxList:
         self.undoStack = []
         self.redoStack = []
 
+
 class InteractionLogger:
     DEBUG, INTERACTION = range(2)
 
-    def __init__(self, filename=None, logLevels=[0,1]):
+    def __init__(self, filename=None, logLevels=[0, 1]):
         self.filename = filename
         self.loggingFile = None
         self.startTime = time()
@@ -486,5 +507,7 @@ class InteractionLogger:
             self.loggingFile.close()
 
     def log(self, string, level=0):
-        if self.loggingFile is not None and any(map(lambda x: x==level, self.logLevels)):
-            self.loggingFile.write(str(time() - self.startTime) + " " + string + "\n")
+        if self.loggingFile is not None\
+                and any(map(lambda x: x == level, self.logLevels)):
+            self.loggingFile.write(
+                str(time() - self.startTime) + " " + string + "\n")
