@@ -24,17 +24,16 @@ import cv2
 
 from Pt import *
 from Util import *
-import Hints
-
-BLUE = (255, 0, 0)
-GREEN = (0, 255, 0)
-RED = (0, 0, 255)
-WHITE = (255, 255, 255)
-CYAN = (255, 255, 0)
+import Constants as C
 
 
 class WitnessCam(QtCore.QObject):
+    """Image processing module.
 
+    This class contains the logic to process the live camera frame and static
+    tray image, and modify the insect box locations."""
+
+    # Signals emitted by this class
     sigScanningModeOn = QtCore.Signal(bool)
     sigRemovedBug = QtCore.Signal(int)
     sigShowHint = QtCore.Signal(str)
@@ -42,6 +41,7 @@ class WitnessCam(QtCore.QObject):
     # States/Phases the application can be in
     SELECT_POLYGON, CALIBRATION, SCANNING_MODE = range(3)
 
+    # Algorithm 'constants' (may be modified by calibration phase)
     DRAW_DELTA = 10
     ACTION_DELAY = 25
     BOX_ERROR_TOLERANCE = 0.1
@@ -52,6 +52,11 @@ class WitnessCam(QtCore.QObject):
     STABLE_FRAME_ACTION_THRESHOLD = 0.5
 
     def __init__(self, logger):
+        """Constructor.
+
+        Keyword Arguments:
+        logger -- a Util.InteractionLogger instance"""
+
         super(WitnessCam, self).__init__()
 
         self.logger = logger
@@ -63,30 +68,35 @@ class WitnessCam(QtCore.QObject):
         self.mainWindow = win
 
     def reset(self):
+        """Resets the internal state of the object"""
+
         self.phase = WitnessCam.SELECT_POLYGON
+
         self.polyPoints = []
         self.polyPointsRedo = []
         self.polygon_model = None
+
         self.rescalePlacedBoxes = True
-        self.mouse_position_big_label = (0, 0)
+        self.mousePos = (0, 0)
         self.camBackground = None
+
         self.removedBug = -1
         self.currentSelectionBox = None
         if self.calibrate is not None:
             self.calibrate.exit()
             self.calibrate = None
 
-        # Variables used to fin the removed bug
         self.activeFrameCurrentDiff = None
         self.activeFrameLastDiff = None
         self.activeFrameSmoothDelta = None
+
         self.stableRun = 0
         self.stableBoxRun = 0
         self.stableAverage = 0
         self.lastStableAverage = 0
         self.lastMedpos = None
 
-        self.camera_image = None
+        self.cameraImage = None
         self.logger.log('INIT WitnessCam class', 0)
 
     def amendFrame(self, camera_frame, static_frame, big_scale, small_scale,
@@ -98,36 +108,51 @@ class WitnessCam(QtCore.QObject):
         Keywords Arguments:
         camera_frame -- image from camera as numpy array
         static_frame -- loaded tray scan image
+        big_scale -- float scale of the camera_frame
+        small_scale -- float scale of the static_frame
+        placed_boxes -- Util.BugBoxList instance
 
-        Return: (camera_frame, static_frame)
+        Return: (camera_frame, static_frame, placed_boxes)
         camera_frame -- the processed frame from the camera view
-        static_frame -- the amended tray image"""
+        static_frame -- the amended tray image
+        placed_boxes -- Util.BigBoxList instance"""
 
-        self.camera_image = camera_frame
+        self.cameraImage = camera_frame
 
+        # No need to modify the passed in images
         camera_frame_algo = np.copy(camera_frame)
         camera_frame_show = np.copy(camera_frame)
         static_frame = np.copy(static_frame)
 
-        (mx, my) = self.mouse_position_big_label
+        # Setup drawing variables
+        (mx, my) = self.mousePos
         dB = int(WitnessCam.DRAW_DELTA/big_scale)
         dS = int(WitnessCam.DRAW_DELTA/small_scale)
 
         if self.phase == WitnessCam.SELECT_POLYGON:
             # Draw the cursor on the image
             cv2.line(camera_frame_show, (mx-dB, my), (mx+dB, my),
-                     BLUE, max(int(dB/5), 1))
+                     C.BLUE, max(int(dB/5), 1))
             cv2.line(camera_frame_show, (mx, my-dB), (mx, my+dB),
-                     BLUE, max(int(dB/5), 1))
+                     C.BLUE, max(int(dB/5), 1))
 
             # Draw the circles for the placed points
             for p in self.polyPoints:
-                cv2.circle(camera_frame_show, (p.x, p.y), int(dB*0.6), GREEN)
+                cv2.circle(camera_frame_show, (p.x, p.y), int(dB*0.6), C.GREEN)
 
             return (camera_frame_show, static_frame, placed_boxes)
 
+        elif self.phase == WitnessCam.CALIBRATION:
+
+            # Continue to update intern state while calibration is happening
+            (camera_frame_algo, centroid) =\
+                self.getFrameDifferenceCentroid(camera_frame_algo)
+            return (static_frame, camera_frame_algo, placed_boxes)
+
         elif self.phase == WitnessCam.SCANNING_MODE:
 
+            # If the boxes were just loaded or created, then the live boxes are
+            # dirty and need to be recalculated
             if self.rescalePlacedBoxes\
                     or placed_boxes.shouldRecomputeLiveBoxes():
                 for i in range(len(placed_boxes)):
@@ -147,8 +172,8 @@ class WitnessCam(QtCore.QObject):
                         y2 = max(p1.y, p2.y, p3.y, p4.y)
                         placed_boxes[i].live = (x1, y1, x2, y2)
 
-            self.rescalePlacedBoxes = False
-            placed_boxes.recomputedLiveBoxes()
+                self.rescalePlacedBoxes = False
+                placed_boxes.recomputedLiveBoxes()
 
             # Check if an insect has been moved from/to the tray, and get its
             # position in the camera frame
@@ -161,40 +186,45 @@ class WitnessCam(QtCore.QObject):
                 (trayHeight, trayWidth, _) = static_frame.shape
                 (u, v) = poly2square(self.polygon_model, trayWidth, trayHeight,
                                      centroid).t()
-                cv2.line(static_frame, (u-dB, v), (u+dB, v), RED,
+                cv2.line(static_frame, (u-dB, v), (u+dB, v), C.RED,
                          max(int(dB/5), 1))
-                cv2.line(static_frame, (u, v-dB), (u, v+dB), RED,
+                cv2.line(static_frame, (u, v-dB), (u, v+dB), C.RED,
                          max(int(dB/5), 1))
-
-            # Draw all the boxes that have already been placed
-            self.drawPlacedBoxes(static_frame, placed_boxes, GREEN, RED, BLUE,
-                                 dB)
 
             # Once the camera view has been stable for a while, try to find box
             if self.stableRun >= WitnessCam.ACTION_DELAY:
                 self.findCorrectBox(centroid, camera_frame_algo, static_frame,
                                     placed_boxes, dB)
 
+            # Draw the outline of the tray area
             self.drawTrayArea(camera_frame_show, dS)
-            return (static_frame, camera_frame_show, placed_boxes)
 
-        elif self.phase == WitnessCam.CALIBRATION:
-            (camera_frame_algo, centroid) =\
-                self.getFrameDifferenceCentroid(camera_frame_algo)
+            # Draw all the boxes that have already been placed
+            self.drawPlacedBoxes(static_frame, placed_boxes, C.GREEN, C.RED,
+                                 C.BLUE, dB)
             return (static_frame, camera_frame_algo, placed_boxes)
 
     def allowEditing(self):
+        """Returns whether the AppData class should allow editing of the placed
+        boxes."""
+
         return self.phase == WitnessCam.SCANNING_MODE
 
     def mousePress(self, ev, scale):
+        """Called when a user clicks on the big label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent
+        scale -- scale of the image shown in the big label"""
+
         if self.phase == WitnessCam.SELECT_POLYGON:
             point = Pt(int(ev.pos().x()/scale), int(ev.pos().y()/scale))
 
             if any(map(lambda p: p == point, self.polyPoints)):
-                self.sigShowHint.emit(Hints.HINT_TRAYAREA_BADPOINT)
+                self.sigShowHint.emit(C.HINT_TRAYAREA_BADPOINT)
             else:
                 self.polyPoints.append(point)
-                self.sigShowHint.emit(Hints.HINT_TRAYAREA_234)
+                self.sigShowHint.emit(C.HINT_TRAYAREA_234)
 
                 if len(self.polyPoints) == 4:
                     self.gotTrayArea()
@@ -202,14 +232,31 @@ class WitnessCam(QtCore.QObject):
                 self.polyPointRedo = []
 
     def mouseMove(self, ev, scale):
-        self.mouse_position_big_label = \
-            (int(ev.pos().x()/scale), int(ev.pos().y()/scale))
+        """Called when a user moves the mouse on the big label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent
+        scale -- scale of the image shown in the big label"""
+
+        self.mousePos = (int(ev.pos().x()/scale), int(ev.pos().y()/scale))
 
     def mouseRelease(self, ev, scale):
-        None
+        """Called when a user releases the mouse on the big label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent
+        scale -- scale of the image shown in the big label"""
+
+        pass
 
     def mouseScroll(self, ev, scale):
-        None
+        """Called when a user scrolls the mouse on the big label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QScrollEvent
+        scale -- scale of the image shown in the big label"""
+
+        pass
 
     def getFrameDifferenceCentroid(self, frame):
         """Given the difference between teh current camera frame and the saved
@@ -260,8 +307,9 @@ class WitnessCam(QtCore.QObject):
         frame[frame < WitnessCam.GRAY_THRESHOLD] = 0
         tframe = np.copy(frame)
 
-        # Use the processed image difference frame to find the center of the
-        # difference
+        # Determine whether the frame has been stable for a while, and if it
+        # has been, then compute the center of the difference in the frame.
+        # This is expected to be the center of the removed insect
         medpos = None
         if self.activeFrameLastDiff is not None:
 
@@ -284,11 +332,13 @@ class WitnessCam(QtCore.QObject):
                 self.stableBoxRun = 0
                 self.stableBox = None
 
+            # Update the calibration/debug gui with these debug values
             self.calibrate.updateValues(
                 self.stableRun, self.stableBoxRun, self.activeFrameCurrentDiff,
                 self.activeFrameSmoothDelta)
 
             # If the frame has been stable for long enough, then
+            # find the centroid of the frame difference
             if self.phase is not WitnessCam.CALIBRATION and \
                     self.stableRun > WitnessCam.ACTION_DELAY and \
                     self.activeFrameCurrentDiff \
@@ -318,28 +368,35 @@ class WitnessCam(QtCore.QObject):
 
         Keyword Arguments:
         image -- the numpy array image that the boxes will be drawn on
+        boxes -- the BugBoxList of the placed boxes
         regular -- the colour of the boxes
-        selected -- the colour of the selected box
+        selected -- the colour of the selected box for editing
+        active -- the color of the box for a removed bug
+        a -- a unit of drawing length
         """
 
+        # Only need to draw while in SCANNING_MODE
         if self.phase == WitnessCam.SCANNING_MODE:
             for i in range(len(boxes)):
 
+                # Some drawing values
                 b = boxes[i].static
                 (px, py) = boxes[i].point
                 t = max(int(a/5), 1)
                 col = None
 
+                # Draw the removed bug box slightly different
                 if i == self.removedBug:
                     col = active
                     ((_, h), _) = cv2.getTextSize(
                         boxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0, t)
                     cv2.putText(image, boxes[i].name, (b[0]-int(a/2), b[3]+h),
-                                cv2.FONT_HERSHEY_SIMPLEX, a/18.0, WHITE, t)
+                                cv2.FONT_HERSHEY_SIMPLEX, a/18.0, C.WHITE, t)
                     cv2.rectangle(image, b[0:2], b[2:4], active, t)
                 else:
                     col = regular
 
+                # Draw the circle marker on each insect
                 cv2.line(image, (px, py-a), (px, py+a), col, t)
                 cv2.line(image, (px+a, py), (px-a, py), col, t)
                 cv2.circle(image, (px, py), a, col, t)
@@ -352,7 +409,10 @@ class WitnessCam(QtCore.QObject):
         Keyword Arguments:
         live_pt -- a point on the live frame representing the location of the
             insect
-        live_frame -- grayscale difference map of the current camera frame"""
+        live_frame -- grayscale difference map of the current camera frame
+        static_frame -- the static tray image scan as a numpy array
+        placed_boxes -- Util.BugBoxList instance
+        big_draw -- basic drawing length on the big label"""
 
         if live_pt is not None:
             # Generate a box on the camera image that contains the live point
@@ -360,6 +420,7 @@ class WitnessCam(QtCore.QObject):
                 self.floodFillBox(live_pt, live_frame, static_frame)
 
             if static_box is not None:
+                # Get the camera box position in the tray scan
                 (trayHeight, trayWidth, _) = static_frame.shape
                 static_pt = poly2square(self.polygon_model, trayWidth,
                                         trayHeight, live_pt)
@@ -375,8 +436,8 @@ class WitnessCam(QtCore.QObject):
                     (x1, y1, x2, y2) = self.stableBox[0]
                     (x3, y3, x4, y4) = static_box
                     t = max(big_draw/5, 1)
-                    cv2.rectangle(static_frame, (x1, y1), (x2, y2), CYAN, t)
-                    cv2.rectangle(static_frame, (x3, y3), (x4, y4), WHITE, t)
+                    cv2.rectangle(static_frame, (x1, y1), (x2, y2), C.CYAN, t)
+                    cv2.rectangle(static_frame, (x3, y3), (x4, y4), C.WHITE, t)
                     w = x2-x1
                     h = y2-y1
                     eps = WitnessCam.BOX_ERROR_TOLERANCE
@@ -418,7 +479,7 @@ class WitnessCam(QtCore.QObject):
                         self.setCurrentSelectionBox(placed_boxes, i)
                         self.refreshCamera()
 
-                    self.sigShowHint.emit(Hints.HINT_ENTERBARCODE)
+                    self.sigShowHint.emit(C.HINT_ENTERBARCODE)
 
     def gotTrayArea(self):
         """Called when the user has selected the four points that represent
@@ -440,12 +501,14 @@ class WitnessCam(QtCore.QObject):
 
         self.phase = WitnessCam.CALIBRATION
         self.showCalibrationWindow()
-        self.sigShowHint.emit(Hints.HINT_CALIBRATE)
+        self.sigShowHint.emit(C.HINT_CALIBRATE)
 
         # Save the current view of the camera
         self.refreshCamera()
 
     def showCalibrationWindow(self):
+        """Show the calibration window"""
+
         self.calibrate = WitnessCam.CalibrationWindow(self)
 
     def floodFillBox(self, p, camera_mask, static_frame):
@@ -500,6 +563,8 @@ class WitnessCam(QtCore.QObject):
         return (None, None)
 
     def resetTrayArea(self):
+        """Called when the suer whants to reset the tray area trace"""
+
         self.phase = WitnessCam.SELECT_POLYGON
 
         self.polyPoints = []
@@ -516,39 +581,54 @@ class WitnessCam(QtCore.QObject):
             self.calibrate.exit()
             self.calibrate = None
 
-        self.sigShowHint.emit(Hints.HINT_TRAYAREA_1)
+        self.sigShowHint.emit(C.HINT_TRAYAREA_1)
 
     def drawTrayArea(self, image, a):
+        """Draws the trace of the selected tray area.
+
+        Keyword Arguments:
+        image -- the image to draw the tray on it
+        a -- the draw length constant"""
+
         for i in range(len(self.polyPoints)):
             p1 = self.polyPoints[i].t()
             p2 = self.polyPoints[(i+1) % len(self.polyPoints)].t()
-            cv2.line(image, p1, p2, BLUE, max(a/5, 1))
+            cv2.line(image, p1, p2, C.BLUE, max(a/5, 1))
 
     def refreshCamera(self):
         """Save the current camera view as the background, and reset some
         counters"""
+
         if self.phase is WitnessCam.SCANNING_MODE\
                 or self.phase is WitnessCam.CALIBRATION:
-            self.camBackground = np.copy(self.camera_image)
+            self.camBackground = np.copy(self.cameraImage)
             self.camBackground = cv2.cvtColor(self.camBackground,
                                               cv2.cv.CV_BGR2Lab)
             self.stableRun = 0
             self.stableRunBox = 0
 
     def setCurrentSelectionBox(self, boxes, i=-1):
+        """Set that an insect has been removed and selected.
+
+        Keyword Arguments:
+        boxes -- Util.BugBoxList instance
+        i -- index of the selected box in the boxes list"""
+
         if boxes is not None and i != -1:
             self.currentSelectionBox = boxes[i]
-            self.sigShowHint.emit(Hints.HINT_ENTERBARCODE)
+            self.sigShowHint.emit(C.HINT_ENTERBARCODE)
         else:
             self.currentSelectionBox = None
 
         self.removedBug = i
         self.sigRemovedBug.emit(i)
 
+    @QtCore.Slot()
     def onEditBoxSelected(self, i):
         self.refreshCamera()
         self.setCurrentSelectionBox(None, -1)
 
+    @QtCore.Slot()
     def onEditBoxDeleted(self, i):
         self.refreshCamera()
 
@@ -571,6 +651,9 @@ class WitnessCam(QtCore.QObject):
             return False
 
     class CalibrationWindow(QtGui.QWidget):
+        """This window shows a small debug gui that allows the user to
+        calibrate the vision system."""
+
         def __init__(self, data, parent=None):
             super(WitnessCam.CalibrationWindow, self).__init__(parent)
             self.initUI()
@@ -584,7 +667,7 @@ class WitnessCam(QtCore.QObject):
         def initUI(self):
             mainContent = QtGui.QGridLayout(self)
 
-            self.btnNext = QtGui.QPushButton(Hints.CALIBRATION_STAGE1)
+            self.btnNext = QtGui.QPushButton(C.CALIBRATION_STAGE1)
 
             self.lblActDelay = QtGui.QLabel('ACTION_DELAY: ')
             self.txtActDelayVal = QtGui.QLineEdit(str(WitnessCam.ACTION_DELAY))
@@ -649,21 +732,21 @@ class WitnessCam(QtCore.QObject):
         def nextStep(self):
             self.calibrationStage += 1
             if self.calibrationStage == 1:
-                self.btnNext.setText(Hints.CALIBRATION_STAGE2)
+                self.btnNext.setText(C.CALIBRATION_STAGE2)
                 self.diffValues = []
                 self.deltaValues = []
             elif self.calibrationStage == 2:
-                self.btnNext.setText(Hints.CALIBRATION_STAGE3)
+                self.btnNext.setText(C.CALIBRATION_STAGE3)
                 self.delay = len(self.diffValues)/5
                 self.diff = sum(self.diffValues) / len(self.diffValues)
                 self.delta =\
                     sum(map(abs, self.deltaValues)) / len(self.deltaValues)
             elif self.calibrationStage == 3:
-                self.btnNext.setText(Hints.CALIBRATION_STAGE4)
+                self.btnNext.setText(C.CALIBRATION_STAGE4)
                 self.diffValues = []
                 self.deltaValues = []
             elif self.calibrationStage == 4:
-                self.btnNext.setText(Hints.CALIBRATION_STAGE5)
+                self.btnNext.setText(C.CALIBRATION_STAGE5)
                 self.delay = len(self.diffValues)/5
                 self.diff = sum(self.diffValues) / len(self.diffValues)
                 self.delta =\
@@ -672,8 +755,8 @@ class WitnessCam(QtCore.QObject):
                 self.txtDelta.setText(str(self.delta*20))
                 self.txtAction.setText(str(self.diff/10))
             elif self.calibrationStage == 5:
-                self.btnNext.setText(Hints.CALIBRATION_STAGE6)
-                self.data.sigShowHint.emit(Hints.HINT_REMOVEBUG_OR_EDIT)
+                self.btnNext.setText(C.CALIBRATION_STAGE6)
+                self.data.sigShowHint.emit(C.HINT_REMOVEBUG_OR_EDIT)
                 self.data.phase = WitnessCam.SCANNING_MODE
                 self.data.refreshCamera()
                 self.btnNext.setEnabled(False)

@@ -26,26 +26,27 @@ import numpy as np
 from AppData import *
 from Util import *
 from Pt import *
+import Constants as C
 
 
-class ControlPanel(QtGui.QFrame):
-    """A QtWidget that holds all the control buttons for the application."""
+class BarcodeEntry(QtGui.QFrame):
+    """A QtWidget that holds takes the barcode entry"""
 
     # Signals emmited by the control panel
 
     def __init__(self, data, parent=None):
-        super(ControlPanel, self).__init__(parent)
+        super(BarcodeEntry, self).__init__(parent)
         self.data = data
         self.initUI()
 
     def initUI(self):
         # Setup the panel and layout
-        panelLayout = QtGui.QVBoxLayout(self)
+        panelLayout = QtGui.QHBoxLayout()
         self.setLayout(panelLayout)
 
         # Create the Textbox label
         self.lblTextLabel = QtGui.QLabel()
-        self.lblTextLabel.setText('ID:')
+        self.lblTextLabel.setText(C.BARCODE_LABEL_TEXT)
 
         # Create the Barcode label
         self.txtBarcode = QtGui.QLineEdit()
@@ -53,17 +54,9 @@ class ControlPanel(QtGui.QFrame):
         self.txtBarcode.setMinimumWidth(100)
         self.txtBarcode.setEnabled(False)
 
-        # Create frame to hold label and textbox side by side
-        self.pnlBarcode = QtGui.QFrame()
-        barcodePanelLayout = QtGui.QHBoxLayout(self)
-        self.pnlBarcode.setLayout(barcodePanelLayout)
-
         # Place all buttons and labels on the panel
-        barcodePanelLayout.addWidget(self.lblTextLabel)
-        barcodePanelLayout.addWidget(self.txtBarcode)
-        panelLayout.addStretch(1)
-        panelLayout.addWidget(self.pnlBarcode)
-        panelLayout.addStretch(1)
+        panelLayout.addWidget(self.lblTextLabel)
+        panelLayout.addWidget(self.txtBarcode)
 
         # Connect slots for the buttion actions
         self.txtBarcode.textEdited.connect(self.data.newBugIdEntered)
@@ -75,10 +68,13 @@ class ControlPanel(QtGui.QFrame):
 
 
 class FileBrowser(QtGui.QFrame):
+    """A QWidget that build the file browser"""
 
     sigFileSelected = QtCore.Signal(str)
 
     def __init__(self, parent=None):
+        """Object constructor"""
+
         super(FileBrowser, self).__init__(parent)
         self.initUI()
 
@@ -87,21 +83,26 @@ class FileBrowser(QtGui.QFrame):
         self.imageFilename = None
 
     def initUI(self):
-        panelLayout = QtGui.QVBoxLayout(self)
+        """Initialize widget components"""
+
+        panelLayout = QtGui.QVBoxLayout()
         self.setLayout(panelLayout)
 
+        # Setup the bottom panel to contain the prev/next buttons
         bottomPanel = QtGui.QFrame(self)
-        bottomLayout = QtGui.QHBoxLayout(self)
+        bottomLayout = QtGui.QHBoxLayout()
         bottomPanel.setLayout(bottomLayout)
 
+        # Setup the tree widget to contain the files
         self.treeFileBrowser = QtGui.QTreeWidget(self)
         self.treeFileBrowser.setHeaderItem(
-            QtGui.QTreeWidgetItem(['Filename', '# Bugs']))
-        self.btnNext = QtGui.QPushButton('>>')
+            QtGui.QTreeWidgetItem(C.FILEBROWSER_COLUMNS))
+        self.btnNext = QtGui.QPushButton(C.FILEBROWSER_NEXT_TEXT)
         self.btnNext.setEnabled(False)
-        self.btnPrevious = QtGui.QPushButton('<<')
+        self.btnPrevious = QtGui.QPushButton(C.FILEBROWSER_PREV_TEXT)
         self.btnPrevious.setEnabled(False)
 
+        # Put components into the layouts
         bottomLayout.addStretch(1)
         bottomLayout.addWidget(self.btnPrevious)
         bottomLayout.addStretch(1)
@@ -110,27 +111,36 @@ class FileBrowser(QtGui.QFrame):
         panelLayout.addWidget(self.treeFileBrowser)
         panelLayout.addWidget(bottomPanel)
 
+        # Connect signals to slots
         self.treeFileBrowser.itemDoubleClicked.connect(self.doubleClicked)
         self.btnNext.clicked.connect(self.nextClicked)
         self.btnPrevious.clicked.connect(self.previousClicked)
 
-    def refresh(self, currentPath, imageFilename):
-        self.currentPath = currentPath
-        self.imageFilename = imageFilename
+    def refresh(self, current_path, image_filename):
+        """Populate the files displayed inside the file browser.
 
+        Keyword Arguments:
+        current_path -- path of the directory to display in the file browser
+        image_filename -- filename of the currently loaded image"""
+
+        self.current_path = current_path
+        self.image_filename = image_filename
+
+        # Build list of image files in the directory
         images = [(f, guess_type(f))
-                  for f in listdir(currentPath)
-                  if os.path.isfile(f)]
+                  for f in listdir(current_path) if os.path.isfile(f)]
         images = [f
                   for (f, (t, e)) in images
                   if t is not None and len(t) > 5 and t[0:5] == 'image']
 
+        # Clear contents of tree widget
         model = self.treeFileBrowser.model()
         for _ in range(model.rowCount()):
             model.removeRow(0)
 
+        # Populate tree widget with new contents
         for f in images:
-            csvfile = currentPath+"/"+changeExtension(f, 'csv')
+            csvfile = current_path+"/"+changeExtension(f, 'csv')
             count = 'n/a'
 
             if os.path.isfile(csvfile):
@@ -144,7 +154,9 @@ class FileBrowser(QtGui.QFrame):
 
             item = QtGui.QTreeWidgetItem([f, count])
             self.treeFileBrowser.addTopLevelItem(item)
-            if f == imageFilename:
+
+            # Highlight the currently loaded image
+            if f == image_filename:
                 font = item.font(0)
                 font.setBold(True)
                 item.setFont(0, font)
@@ -152,9 +164,11 @@ class FileBrowser(QtGui.QFrame):
                 self.treeFileBrowser.setItemSelected(item, True)
                 self.currentItem = item
 
+        # Autosize the columns
         self.treeFileBrowser.resizeColumnToContents(0)
         self.treeFileBrowser.resizeColumnToContents(1)
 
+        # Enables next and prev buttons if next and prev exist
         if self.treeFileBrowser.itemBelow(self.currentItem) is None:
             self.btnNext.setEnabled(False)
         else:
@@ -164,15 +178,24 @@ class FileBrowser(QtGui.QFrame):
         else:
             self.btnPrevious.setEnabled(True)
 
+    @QtCore.Slot()
     def doubleClicked(self, i, c):
+        """Called when the user double clicks an entry in the file browser"""
+
         if self.currentItem is not i:
             self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
 
+    @QtCore.Slot()
     def nextClicked(self):
+        """Called when the user clicks the next button under the filebrowser"""
+
         i = self.treeFileBrowser.itemBelow(self.currentItem)
         self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
 
+    @QtCore.Slot()
     def previousClicked(self):
+        """Called when the user clicks the prev button under the filebrowser"""
+
         i = self.treeFileBrowser.itemAbove(self.currentItem)
         self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
 
@@ -190,6 +213,11 @@ class BigLabel(QtGui.QLabel):
     sigScroll = QtCore.Signal(QtGui.QWheelEvent, float)
 
     def __init__(self, data, parent=None):
+        """Object constructor
+
+        Keyword Arguments
+        data -- AppData instance"""
+
         super(BigLabel, self).__init__(parent)
         self.data = data
         self.initUI()
@@ -202,51 +230,91 @@ class BigLabel(QtGui.QLabel):
     def initUI(self):
         self.setAlignment(QtCore.Qt.AlignTop)
 
-    def setImage(self, cvImage):
-        if cvImage.ndim == 2:
-            cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_GRAY2BGRA)
+    def setImage(self, cv_image):
+        """Displays an image in the label.
+
+        Keyword Arguments:
+        cv_image -- OpenCV2 image, represented as a numpy array"""
+
+        # Handle grayscale and color images
+        if cv_image.ndim == 2:
+            cv_image = cv2.cvtColor(cv_image, cv2.cv.CV_GRAY2BGRA)
         else:
-            cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2BGRA)
-        originalSize = (cvImage.shape[1], cvImage.shape[0])
+            cv_image = cv2.cvtColor(cv_image, cv2.cv.CV_BGR2BGRA)
+
+        # Scale image to fit in label
+        originalSize = (cv_image.shape[1], cv_image.shape[0])
         (w, h, rat) = computeImageScaleFactor(
             originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
-        cvImage = cv2.resize(cvImage, (w, h))
-        img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
-                           cvImage.strides[0], QtGui.QImage.Format_ARGB32)
 
+        # Convert opencv image to pyside Pixmap for display in label
+        cv_image = cv2.resize(cv_image, (w, h))
+        img = QtGui.QImage(cv_image, cv_image.shape[1], cv_image.shape[0],
+                           cv_image.strides[0], QtGui.QImage.Format_ARGB32)
         self.setPixmap(QtGui.QPixmap.fromImage(img))
 
     def mousePressEvent(self, ev):
+        """Invoked when the user presses the mouse on the label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent"""
+
         self.sigMousePress.emit(ev, self.imageScaleRatio)
 
     def mouseMoveEvent(self, ev):
+        """Invoked when the user moved the mouse on the label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent"""
+
         self.sigMouseMove.emit(ev, self.imageScaleRatio)
 
     def mouseReleaseEvent(self, ev):
+        """Invoked when the user releases the mouse on the label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QMouseEvent"""
+
         self.sigMouseRelease.emit(ev, self.imageScaleRatio)
 
     def wheelEvent(self, ev):
+        """Invoked when the user scrolls the mouse on the label.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QWheelEvent"""
+
         self.sigScroll.emit(ev, self.imageScaleRatio)
 
     def newResizeScale(self, scale):
+        """Notifies the label that it should resize.
+
+        Keyword Arguments:
+        scale -- float scale of the original size"""
+
         self.resizeScale = scale
         (sx, sy) = scale
         (w, h) = self.originalSize
         self.resize(int(w*sx), int(h*sy))
 
     def getCurrentSize(self):
+        """Get the current size of the label contents"""
+
         (sx, sy) = self.resizeScale
         (w, h) = self.originalSize
         return (w*sx, h*sy)
 
     def generateInitialImage(self):
+        """Geneate the image to be displayed when the label is created. For the
+        big label, this is a dashed border with a message to drag and drop a
+        file to load it."""
+
         (w, h) = self.originalSize
         img = np.zeros((h, w, 4), np.uint8)
 
+        # Write the text on the label
         b = 4*h/10
-        for text in ['Drag and Drop tray scan image file here',
-                     'or load it from the File menu']:
+        for text in C.INITIAL_BIGLABEL_TEXT:
             ((tw, th), _) = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX,
                                             0.8, 1)
             cv2.putText(img, text, ((w-tw)/2, b), cv2.FONT_HERSHEY_SIMPLEX,
@@ -254,6 +322,7 @@ class BigLabel(QtGui.QLabel):
             b += th + 10
         cv2.GaussianBlur(img, (3, 3), 0.5, img)
 
+        # Draw the dashed line along the border
         s = w/(2*20+1)
         for i in range(0, w+100, s)[0::2]:
             cv2.rectangle(img, (i, 0), (i+s, 2), (0, 0, 0, 128), -1)
@@ -273,6 +342,11 @@ class SmallLabel(QtGui.QLabel):
     resizeScale = (1.0, 1.0)
 
     def __init__(self, data, parent=None):
+        """Constructor for the object.
+
+        Keyword Arguments:
+        data -- AppData instance"""
+
         super(SmallLabel, self).__init__(parent)
         self.data = data
         self.initUI()
@@ -284,33 +358,49 @@ class SmallLabel(QtGui.QLabel):
     def initUI(self):
         self.setAlignment(QtCore.Qt.AlignTop)
 
-    def setImage(self, cvImage):
-        if cvImage.ndim == 2:
-            cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_GRAY2BGRA)
+    def setImage(self, cv_image):
+        """Displays an image in the label.
+
+        Keyword Arguments:
+        cv_image -- OpenCV2 image, represented as a numpy array"""
+
+        if cv_image.ndim == 2:
+            cv_image = cv2.cvtColor(cv_image, cv2.cv.CV_GRAY2BGRA)
         else:
-            cvImage = cv2.cvtColor(cvImage, cv2.cv.CV_BGR2BGRA)
-        originalSize = (cvImage.shape[1], cvImage.shape[0])
+            cv_image = cv2.cvtColor(cv_image, cv2.cv.CV_BGR2BGRA)
+        originalSize = (cv_image.shape[1], cv_image.shape[0])
         (w, h, rat) = computeImageScaleFactor(
             originalSize, self.getCurrentSize())
         self.imageScaleRatio = rat
-        cvImage = cv2.resize(cvImage, (w, h))
-        img = QtGui.QImage(cvImage, cvImage.shape[1], cvImage.shape[0],
-                           cvImage.strides[0], QtGui.QImage.Format_ARGB32)
+        cv_image = cv2.resize(cv_image, (w, h))
+        img = QtGui.QImage(cv_image, cv_image.shape[1], cv_image.shape[0],
+                           cv_image.strides[0], QtGui.QImage.Format_ARGB32)
 
         self.setPixmap(QtGui.QPixmap.fromImage(img))
 
     def newResizeScale(self, scale):
+        """Notifies the label that it should resize.
+
+        Keyword Arguments:
+        scale -- float scale of the original size"""
+
         self.resizeScale = scale
         (sx, sy) = scale
         (w, h) = self.originalSize
         self.resize(int(w*sx), int(h*sy))
 
     def getCurrentSize(self):
+        """Get the current size of the label contents"""
+
         (sx, sy) = self.resizeScale
         (w, h) = self.originalSize
         return (w*sx, h*sy)
 
     def generateInitialImage(self):
+        """Geneate the image to be displayed when the label is created. For the
+        big label, this is a dashed border with a message to drag and drop a
+        file to load it."""
+
         (w, h) = self.originalSize
         img = np.zeros((h, w, 4), np.uint8)
         img[:, :, :] = [128, 128, 128, 128]

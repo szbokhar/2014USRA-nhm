@@ -35,21 +35,36 @@ class MainWindow(QtGui.QMainWindow):
     sigQuitAction = QtCore.Signal()
 
     def __init__(self, cv_impl, logger):
+        """Main window constructor.
+
+        Keyword Arguments:
+        cv_impl -- Class conforming to the vision implementation interface
+        logger -- InteractionLogger instance"""
+
         super(MainWindow, self).__init__()
         self.logger = logger
         cv_impl.setMainWindow(self)
         self.initUI(cv_impl)
 
+        # Initialize cursors that will be used
+        self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+        self.dragCursor = QtGui.QCursor(QtCore.Qt.DragLinkCursor)
+
     def initUI(self, cv_impl):
+        """Setup the UI for the window.
+
+        Keyword Arguments:
+        cv_impl -- Class conforming to the vision implementation interface"""
+
         # Setup main content area
         mainWidget = QtGui.QFrame(self)
         interactionWidget = QtGui.QFrame(mainWidget)
-        mainContent = QtGui.QHBoxLayout(self)
-        interactionContent = QtGui.QVBoxLayout(self)
+        mainContent = QtGui.QHBoxLayout()
+        interactionContent = QtGui.QVBoxLayout()
 
         # Setup Gui Elements
         self.data = AppData(self, cv_impl, self.logger)
-        self.controlPanel = ControlPanel(self.data)
+        self.controlPanel = BarcodeEntry(self.data)
         self.lblBig = BigLabel(self.data)
         self.lblSmall = SmallLabel(self.data)
         self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
@@ -62,9 +77,9 @@ class MainWindow(QtGui.QMainWindow):
         self.lblHint.setFixedHeight(50)
 
         self.topPanel = QtGui.QFrame()
-        self.topContent = QtGui.QHBoxLayout(self)
+        self.topContent = QtGui.QHBoxLayout()
         self.bottomPanel = QtGui.QFrame()
-        self.bottomContent = QtGui.QHBoxLayout(self)
+        self.bottomContent = QtGui.QHBoxLayout()
 
         # Add GUI elements to window
         mainWidget.setLayout(mainContent)
@@ -87,79 +102,99 @@ class MainWindow(QtGui.QMainWindow):
         # Setup menu bar
         self.buildMenubar(cv_impl)
 
-        self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
-        self.dragCursor = QtGui.QCursor(QtCore.Qt.DragLinkCursor)
-
         # Wire up signals and slots
-        self.sigLoadTrayImage.connect(self.data.setTrayScan)
+        self.sigLoadTrayImage.connect(self.data.loadTrayImage)
         self.sigQuitAction.connect(self.data.quit)
         self.sigUndoAction.connect(self.data.undoAction)
         self.sigRedoAction.connect(self.data.redoAction)
+
         cv_impl.sigScanningModeOn.connect(
             self.controlPanel.txtBarcode.setEnabled)
         cv_impl.sigScanningModeOn.connect(self.actResyncCamera.setEnabled)
         cv_impl.sigRemovedBug.connect(self.data.onBugRemoved)
         cv_impl.sigShowHint.connect(self.lblHint.setText)
+
         self.data.sigSelectedBox.connect(cv_impl.onEditBoxSelected)
         self.data.sigDeletedBox.connect(cv_impl.onEditBoxDeleted)
         self.data.sigShowHint.connect(self.lblHint.setText)
+
         self.fileBrowser.sigFileSelected.connect(self.selectTrayImage)
+
+        self.lblBig.sigMousePress.connect(self.data.mousePress)
+        self.lblBig.sigMouseMove.connect(self.data.mouseMove)
+        self.lblBig.sigMouseRelease.connect(self.data.mouseRelease)
+        self.lblBig.sigScroll.connect(self.data.mouseScroll)
 
         # Finish up window
         self.setAcceptDrops(True)
-        self.statusBar().showMessage("Ready")
+        self.statusBar().showMessage(C.WINDOW_STATUS_READY)
         self.setGeometry(0, 0, self.originalSize[0], self.originalSize[1])
-        self.setWindowTitle('Insect Segmentation')
+        self.setWindowTitle(C.WINDOW_TITLE)
         self.show()
         self.raise_()
 
     def buildMenubar(self, cv_impl):
+        """Build the application menus.
+
+        cv_impl -- vision implementation"""
+
         menubar = QtGui.QMenuBar()
 
+        # File menu
         fileMenu = QtGui.QMenu(menubar)
-        fileMenu.setTitle('File')
+        fileMenu.setTitle(C.MENU_TEXT[0][0])
         fileMenu.addAction(
-            'Open Tray Image',
+            C.MENU_TEXT[0][1][0],
             self.selectTrayImage).setShortcut(QtGui.QKeySequence.Open)
 
-        recentMenu = fileMenu.addMenu('Open Recent Tray Scans')
-        if os.path.isfile('.recentScans.dat'):
-            with open('.recentScans.dat', 'r') as recent_file:
+        # Recent files submenu
+        recentMenu = fileMenu.addMenu(C.MENU_TEXT[0][1][1])
+        if os.path.isfile(C.FILENAME_RECENT_LOADS):
+            with open(C.FILENAME_RECENT_LOADS, 'r') as recent_file:
                 for path in recent_file.readlines():
                     fname = path.split('/')[-1]
                     recentMenu.addAction(
                         fname, partial(self.selectTrayImage, path[0:-1]))
         fileMenu.addSeparator()
+
+        # Save and Quit
         fileMenu.addAction(
-            'Export to CSV',
+            C.MENU_TEXT[0][1][2],
             self.data.exportToCSV).setShortcut(QtGui.QKeySequence.Save)
         fileMenu.addAction(
-            'Quit',
+            C.MENU_TEXT[0][1][3],
             self.sigQuitAction.emit).setShortcut(QtGui.QKeySequence.Quit)
 
+        # Edit menu
         editMenu = QtGui.QMenu(menubar)
-        editMenu.setTitle(' Edit')
+        editMenu.setTitle(C.MENU_TEXT[1][0])
         editMenu.addAction(
-            'Undo',
+            C.MENU_TEXT[1][1][0],
             self.sigUndoAction.emit).setShortcut(QtGui.QKeySequence.Undo)
         editMenu.addAction(
-            'Redo',
+            C.MENU_TEXT[1][1][1],
             self.sigRedoAction.emit).setShortcut(QtGui.QKeySequence.Redo)
 
+        # Image menu
         imageMenu = QtGui.QMenu(menubar)
-        imageMenu.setTitle('Image')
-        imageMenu.addAction('Retrace tray area', cv_impl.resetTrayArea)
+        imageMenu.setTitle(C.MENU_TEXT[2][0])
+        imageMenu.addAction(C.MENU_TEXT[2][1][0], cv_impl.resetTrayArea)
         self.actResyncCamera = imageMenu.addAction(
-            'Resync Camera', cv_impl.refreshCamera)
+            C.MENU_TEXT[2][1][1], cv_impl.refreshCamera)
         self.actResyncCamera.setDisabled(True)
 
+        # Finish set up
         menubar.addMenu(fileMenu)
         menubar.addMenu(editMenu)
         menubar.addMenu(imageMenu)
-
         self.setMenuBar(menubar)
 
     def resizeEvent(self, ev):
+        """Called when the window is resized.
+
+        Keyword Arguments:
+        ev -- PySIde.QtGui.QResizeEvent"""
+
         h = ev.size().height()
         w = ev.size().width()
         self.logger.log('WINDOW resized to (%d, %d)' % (w, h), 1)
@@ -169,53 +204,94 @@ class MainWindow(QtGui.QMainWindow):
         # self.lblSmall.newResizeScale(scale)
 
     def closeEvent(self, event):
+        """Called when someone tries to quit the application.
+
+        Keyword Arguments:
+        event -- PySide.QtGui.QCloseEvent"""
+
         self.data.quit()
 
+    @QtCore.Slot()
     def selectTrayImage(self, fname=None):
+        """Load the tray image.
+
+        Keyword Arguments:
+        fname -- path of the file to load. If not specified then a file load
+            dialog is shows to the user"""
+
+        # If no filename provided, show file load dialog
         if fname is None:
             fname, _ = QtGui.QFileDialog.getOpenFileName(
-                self, "Open Specimin File", ".")
+                self, C.OPENDIALOG_TITLE, '.')
 
-        if fname != "":
+        # Extract filename, directory path, and associated csv filename
+        if fname != '':
             self.logger.log('LOAD by File menu', 1)
-            fpath = fname.split("/")
-            self.currentPath = "/".join(fpath[0:-1])
+            fpath = fname.split('/')
+            self.currentPath = '/'.join(fpath[0:-1])
             csvfile = changeExtension(fpath[-1], 'csv')
-            csvfile = self.currentPath+"/"+csvfile
+            csvfile = self.currentPath+'/'+csvfile
             self.imageFilename = fpath[-1]
+
+            # Boradcast that user has loaded a file
             self.sigLoadTrayImage.emit(fname, csvfile)
 
+            # Update recent files data
             recent_files = []
-            if os.path.isfile('.recentScans.dat'):
-                with open('.recentScans.dat', 'r') as recent_file:
+            if os.path.isfile(C.FILENAME_RECENT_LOADS):
+                with open(C.FILENAME_RECENT_LOADS, 'r') as recent_file:
                     for line in recent_file.readlines():
                         recent_files.append(line[0:-1])
 
             recent_files.insert(0, fname)
             recent_files = dedup_list(recent_files)
 
-            with open('.recentScans.dat', 'w') as recent_file:
+            with open(C.FILENAME_RECENT_LOADS, 'w') as recent_file:
                 for f in recent_files:
                     recent_file.write(f+'\n')
 
+            # Reload file browser
             self.fileBrowser.refresh(self.currentPath, self.imageFilename)
 
     def dragEnterEvent(self, ev):
+        """Called when the user drags something into the window.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QDragEnterEvent"""
+
         if ev.mimeData().hasUrls():
             ev.accept()
             self.setCursor(self.dragCursor)
 
     def dragLeaveEvent(self, ev):
+        """Called when the user drags something out of the window.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QDragLeaveEvent"""
+
         self.setCursor(self.normalCursor)
 
     def dropEvent(self, ev):
+        """Called when the user drags and drops something into the window.
+
+        Keyword Arguments:
+        ev -- PySide.QtGui.QDropEvent"""
+
         self.setCursor(self.normalCursor)
 
+        # If the mimetype is correct, try to load the image
         if ev.mimeData().hasUrls():
             self.logger.log('LOAD by drag and drop', 1)
             self.selectTrayImage(ev.mimeData().urls()[0].path())
 
     def eventFilter(self, obj, event):
+        """Event filter designed to capture undo events directed towards the
+        barcode QLineEdit, and redirect it to the entire window.
+
+        Keyword Arguments:
+        obj -- PySide.QtCore.QObject
+        event -- PySide.QtCore.QEvent"""
+
         if obj == self.controlPanel.txtBarcode\
                 and event.type() == QtCore.QEvent.Type.ShortcutOverride:
             if event.matches(QtGui.QKeySequence.Undo) or\

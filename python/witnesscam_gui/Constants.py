@@ -17,6 +17,14 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 
+# Color Constants
+BLUE = (255, 0, 0)
+GREEN = (0, 255, 0)
+RED = (0, 0, 255)
+WHITE = (255, 255, 255)
+CYAN = (255, 255, 0)
+
+# Next step hints displayed to the user
 HINT_LOADFILE = "Load a tray scan image by draggging a file here or using the \
 file menu"
 HINT_TRAYAREA_1 = "Click on the top left corner of the tray in the scanned \
@@ -35,9 +43,11 @@ HINT_EDITBOX = "Drag box to move. Scroll to resize. Click X to delete. Click \
 another marker to edit it. Remove insect to continue with scanning"
 HINT_CALIBRATE = "Follow the directions on the Calibration window"
 
+# Dialog text shown to the user when Closing the app or loading a new file
 DIALOG_OVERWRITE = "File %s already exists. Would you like to overwrite it?"
 DIALOG_SAVE = "Would you like to save changes to %s?"
 
+# Prompts during the calibraion stage
 CALIBRATION_STAGE1 = "Make sure the camera is perfectly still, and has a \
 clear view of the tray. \nThen Click Here"
 CALIBRATION_STAGE2 = "Wait about 5 seconds without disturbing the camera \
@@ -49,3 +59,27 @@ CALIBRATION_STAGE4 = "Wait about 5 seconds without disturbing the camera view,\
 CALIBRATION_STAGE5 = "Replace the insect on the tray then\nClick Here."
 CALIBRATION_STAGE6 = "Calibration Done. Config values chosen.\nIf ever \
 editing the below values, be sure all insects are on the tray"
+
+
+# UI Text
+INITIAL_BIGLABEL_TEXT = ["Drag and Drop tray scan image file here",
+                         "or load it from the File menu"]
+BARCODE_LABEL_TEXT = "ID: "
+FILEBROWSER_COLUMNS = ["Filename", "# Bugs"]
+FILEBROWSER_NEXT_TEXT = ">>"
+FILEBROWSER_PREV_TEXT = "<<"
+
+WINDOW_TITLE = "Insect Barcode Scanning"
+WINDOW_STATUS_READY = "Ready"
+FILENAME_RECENT_LOADS = ".recentScans.dat"
+MENU_TEXT = [
+    ("File", ["Open Tray Image",
+              "Open Recent Tray Scans",
+              "Export to CSV",
+              "Quit"]),
+    (" Edit", ["Undo",
+              "Redo"]),
+    ("Image", ["Retrace tray area",
+               "Resync camera"])]
+
+OPENDIALOG_TITLE = "Open Tray Image"

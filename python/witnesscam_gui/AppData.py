@@ -20,20 +20,12 @@
 from PySide import QtCore, QtGui
 import cv2
 import csv
-import copy
 import numpy as np
 import os.path
-import sys
 
-from Util import *
 from Pt import *
-import Hints
-
-BLUE = (255, 0, 0)
-GREEN = (0, 255, 0)
-RED = (0, 0, 255)
-WHITE = (255, 255, 255)
-CYAN = (255, 255, 0)
+import Util
+import Constants as C
 
 
 class AppData(QtCore.QObject):
@@ -53,19 +45,19 @@ class AppData(QtCore.QObject):
     DRAW_DELTA = 10
     CAM_MAX_WIDTH = 640
     CAM_MAX_HEIGHT = 480
+    BOX_RESIZE_EDGE_PADDING = 15
 
     def __init__(self, win, cv_impl, logger):
-        """Initializes a bunch of member variables for use in later
-        functions"""
+        """Initializes member variables for use in later functions"""
 
         super(AppData, self).__init__()
 
         self.window = win
-        self.cv_impl = cv_impl
+        self.cvImpl = cv_impl
         self.logger = logger
 
         # Labels for displaying images
-        self.controlPanel = None
+        self.barcodeEntry = None
         self.lblBig = None
         self.lblSmall = None
 
@@ -89,57 +81,47 @@ class AppData(QtCore.QObject):
         self.normalCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
 
         self.logger = logger
-        self.logger.log('INIT AppData', 0)
+        self.logger.log("INIT AppData", 0)
 
         self.reset()
 
     def reset(self):
+        """Reset internal attributes"""
+
         # Mouse position (current and last) on the big label
-        self.bigMPos = (0, 0)
-        self.bigMLastPos = (0, 0)
-
-        # Variables storing info about the quadrilateral containing the tray
-        self.trayBoundingBox = None
-
-        self.removedBug = -1
+        self.mousePos = (0, 0)
+        self.lastMousePos = (0, 0)
 
         # Variables used in keeping track of the placed boxes
-        self.placedBoxes = BugBoxList()
-        self.stableBoxRun = 0
-        self.stableBox = None
-        self.rescalePlacedboxes = False
+        self.bugBoxList = Util.BugBoxList()
+        self.removedBug = -1
 
         # Variables used for editing the boxes
         self.selectedEditBox = None
         self.editAction = AppData.NO_ACTION
 
         # Show Hint
-        self.sigShowHint.emit(Hints.HINT_LOADFILE)
+        self.sigShowHint.emit(C.HINT_LOADFILE)
 
-        self.logger.log('RESET AppData', 0)
+        self.logger.log("RESET AppData", 0)
 
-    def setGuiElements(self, control, big, small):
+    def setGuiElements(self, barcode, big, small):
         """Associate the elements of the gui with the application data.
 
         Keyword Arguments:
-        control -- a ControlPanel instance
+        barcode -- a BarcodeEntry instance
         big -- a BigLabel instance
         small -- a SmallLabel instance"""
 
         # Assign gui elements
-        self.controlPanel = control
+        self.barcodeEntry = barcode
         self.lblBig = big
         self.lblSmall = small
 
-        # Connect signals and slots
-        self.lblBig.sigMousePress.connect(self.bigLabelMousePress)
-        self.lblBig.sigMouseMove.connect(self.bigLabelMouseMove)
-        self.lblBig.sigMouseRelease.connect(self.bigLabelMouseRelease)
-        self.lblBig.sigScroll.connect(self.bigLabelScroll)
+        self.sigShowHint.emit(C.HINT_LOADFILE)
 
-        self.sigShowHint.emit(Hints.HINT_LOADFILE)
-
-    def setTrayScan(self, image_fname, csv_fname):
+    @QtCore.Slot()
+    def loadTrayImage(self, image_fname, csv_fname):
         """Load the tray scan image and activate the camera.
 
         Keyword Arguments:
@@ -152,12 +134,12 @@ class AppData(QtCore.QObject):
 
         # Clear data
         self.reset()
-        self.cv_impl.reset()
-        self.controlPanel.setCurrentBugId('')
+        self.cvImpl.reset()
+        self.barcodeEntry.setCurrentBugId("")
 
         # Load the image
         self.trayPath = image_fname
-        self.logger.log('LOAD image scan file %s' % self.trayPath, 1)
+        self.logger.log("LOAD image scan file %s" % self.trayPath, 1)
         self.trayImage = cv2.imread(self.trayPath, cv2.IMREAD_COLOR)
         self.csvPath = csv_fname
 
@@ -165,32 +147,33 @@ class AppData(QtCore.QObject):
         if os.path.isfile(csv_fname):
             with open(csv_fname) as csvfile:
                 reader = csv.reader(csvfile)
-                self.placedBoxes = BugBoxList()
-                if (reader.next()[1] == ' Rectangle x1'):
+                self.bugBoxList = Util.BugBoxList()
+
+                if (reader.next()[1] == " Rectangle x1"):
                     for b in reader:
-                        box = BugBox(
+                        box = Util.BugBox(
                             b[0], None,
                             (int(b[1]), int(b[2]), int(b[3]), int(b[4])),
                             (int(b[5]), int(b[6])))
-                        self.placedBoxes.newBox(box)
+                        self.bugBoxList.newBox(box)
 
                     self.window.statusBar().showMessage(
-                        'Also loaded CSV file: '
-                        + str(csv_fname.split('/')[-1]))
+                        "Also loaded CSV file: %s" %
+                        str(csv_fname.split("/")[-1]))
                     self.logger.log(
-                        'LOAD found corresponding csv file %s'
+                        "LOAD found corresponding csv file %s"
                         % self.csvPath, 1)
                 else:
                     QtGui.QMessageBox.information(
-                        self.window, 'Error Reading CSV',
-                        'It seems the file ' + str(csv_fname.split('/')[-1]) +
-                        ' id badly formatted. Cannot load.')
+                        self.window, "Error Reading CSV",
+                        "It seems the file %s id badly formatted. Cannot load."
+                        % str(csv_fname.split("/")[-1]))
 
         # Start the camera loop
         self.startCameraFeed()
 
-        self.sigShowHint.emit(Hints.HINT_TRAYAREA_1)
-        self.placedBoxes.clearUndoRedoStacks()
+        self.sigShowHint.emit(C.HINT_TRAYAREA_1)
+        self.bugBoxList.clearUndoRedoStacks()
 
     def startCameraFeed(self):
         """Begin the camera feed and set up the timer loop."""
@@ -202,28 +185,27 @@ class AppData(QtCore.QObject):
             self.frameTimer.timeout.connect(self.getNewCameraFrame)
             self.frameTimer.start(30)
             self.camOn = True
-            self.logger.log('INIT camera', 0)
+            self.logger.log("INIT camera", 0)
 
     def getNewCameraFrame(self):
         """This function is called by the timer 30 times a second to fetch a new
         frame from the camera, have it processed, and display the final result
         to on screen."""
 
-        # Get new camera frame and reload fresh static frame
-        _, self.cameraImage = self.capture.read()
+        # Get new camera frame and downsample it
+        (_, self.cameraImage) = self.capture.read()
         while (self.cameraImage.shape[0] > AppData.CAM_MAX_HEIGHT or
                self.cameraImage.shape[1] > AppData.CAM_MAX_WIDTH):
             self.cameraImage = cv2.pyrDown(self.cameraImage)
 
         # Process and modify the camera and static frames
-        (big_image, small_image, self.placedBoxes) =\
-            self.cv_impl.amendFrame(
-                self.cameraImage, self.trayImage, self.lblBig.imageScaleRatio,
-                self.lblSmall.imageScaleRatio, self.placedBoxes)
+        (big_image, small_image, self.bugBoxList) = self.cvImpl.amendFrame(
+            self.cameraImage, self.trayImage, self.lblBig.imageScaleRatio,
+            self.lblSmall.imageScaleRatio, self.bugBoxList)
 
-        if self.cv_impl.allowEditing():
+        if self.cvImpl.allowEditing():
             dB = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
-            self.draw_editing_ui(big_image, GREEN, RED, BLUE, dB)
+            self.draw_editing_ui(big_image, C.GREEN, C.RED, C.BLUE, dB)
 
         # Display the modified frame to the user
         self.lblBig.setImage(big_image)
@@ -232,7 +214,7 @@ class AppData(QtCore.QObject):
     def setMousepos(self, x, y):
         """Update the current mouse position"""
 
-        self.bigMPos = (x, y)
+        self.mousePos = (x, y)
 
     def draw_editing_ui(self, image, regular, selected, active, a):
         """Given an input image, draw all of the generated boxes on the image.
@@ -244,38 +226,43 @@ class AppData(QtCore.QObject):
         selected -- the colour of the selected box
         """
 
-        for i in range(len(self.placedBoxes)):
-
-            b = self.placedBoxes[i].static
-            (px, py) = self.placedBoxes[i].point
+        for i in range(len(self.bugBoxList)):
+            b = self.bugBoxList[i].static
+            (px, py) = self.bugBoxList[i].point
             t = max(int(a/5), 1)
             col = None
 
             if i == self.selectedEditBox:
+                # Draw box
                 cv2.rectangle(image, b[0:2], b[2:4], selected, t)
+
+                # Draw delete button
                 cv2.rectangle(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a),
                               selected, t)
                 cv2.line(image, (b[2]-a, b[1]+3*a), (b[2]-3*a, b[1]+a),
                          selected, t)
                 cv2.line(image, (b[2]-3*a, b[1]+3*a), (b[2]-a, b[1]+a),
                          selected, t)
+
+                # Draw Box ID
                 ((_, h), _) = cv2.getTextSize(
-                    self.placedBoxes[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0,
+                    self.bugBoxList[i].name, cv2.FONT_HERSHEY_SIMPLEX, a/18.0,
                     t)
-                cv2.putText(image, self.placedBoxes[i].name,
+                cv2.putText(image, self.bugBoxList[i].name,
                             (b[0]-int(a/2), b[3]+h), cv2.FONT_HERSHEY_SIMPLEX,
-                            a/18.0, WHITE, t)
+                            a/18.0, C.WHITE, t)
                 col = selected
             else:
                 col = regular
 
+            # Draw point marker
             if i != self.removedBug:
                 cv2.line(image, (px, py-a), (px, py+a), col, t)
                 cv2.line(image, (px+a, py), (px-a, py), col, t)
                 cv2.circle(image, (px, py), a, col, t)
 
     def exportToCSV(self):
-        """Called when the Export to CSV button is pressed"""
+        """Exports the bugBoxList data to a CSV file"""
 
         if self.csvPath is None or self.csvPath == "":
             return True
@@ -283,11 +270,11 @@ class AppData(QtCore.QObject):
         ret = QtGui.QMessageBox.Save
         message = QtGui.QMessageBox()
         if os.path.isfile(self.csvPath):
-            message.setText(Hints.DIALOG_OVERWRITE
-                            % str(self.csvPath.split('/')[-1]))
+            message.setText(C.DIALOG_OVERWRITE
+                            % str(self.csvPath.split("/")[-1]))
         else:
-            message.setText(Hints.DIALOG_SAVE
-                            % str(self.csvPath.split('/')[-1]))
+            message.setText(C.DIALOG_SAVE
+                            % str(self.csvPath.split("/")[-1]))
 
         message.setStandardButtons(
             QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard
@@ -296,21 +283,22 @@ class AppData(QtCore.QObject):
         ret = message.exec_()
 
         if ret == QtGui.QMessageBox.Save:
-            f = open(self.csvPath, 'w')
-            f.write('Insect Id, Rectangle x1, y1, x2, y1, Point x, y\n')
-            for b in self.placedBoxes:
+            f = open(self.csvPath, "w")
+            f.write("Insect Id, Rectangle x1, y1, x2, y1, Point x, y\n")
+            for b in self.bugBoxList:
                 f.write(b.name + ", " +
-                        str(b.getStaticBox())[1:-1] + ', ' +
-                        str(b.getPoint())[1:-1] + '\n')
+                        str(b.getStaticBox())[1:-1] + ", " +
+                        str(b.getPoint())[1:-1] + "\n")
             self.window.statusBar().showMessage(
-                'Saved data to ' + str(self.csvPath.split('/')[-1]))
+                "Saved data to %" % str(self.csvPath.split("/")[-1]))
             return True
         elif ret == QtGui.QMessageBox.Discard:
             return True
         elif ret == QtGui.QMessageBox.Cancel:
             return False
 
-    def bigLabelMousePress(self, ev, scale):
+    @QtCore.Slot()
+    def mousePress(self, ev, scale):
         """When the mouse is clicked on the big label.
 
         Keyword Arguments:
@@ -319,12 +307,13 @@ class AppData(QtCore.QObject):
             of the big label"""
 
         if self.trayPath is not None:
-            self.cv_impl.mousePress(ev, scale)
+            self.cvImpl.mousePress(ev, scale)
 
-        if self.cv_impl.allowEditing():
+        if self.cvImpl.allowEditing():
             self.editMousePress(ev)
 
-    def bigLabelMouseMove(self, ev, scale):
+    @QtCore.Slot()
+    def mouseMove(self, ev, scale):
         """When the mouse is clicked on the big label.
 
         Keyword Arguments:
@@ -337,29 +326,31 @@ class AppData(QtCore.QObject):
         self.lblBig.setCursor(self.normalCursor)
 
         if self.trayPath is not None:
-            self.cv_impl.mouseMove(ev, scale)
+            self.cvImpl.mouseMove(ev, scale)
 
-        if self.cv_impl.allowEditing():
+        if self.cvImpl.allowEditing():
             self.editMouseMove()
 
-    def bigLabelMouseRelease(self, ev, scale):
+    @QtCore.Slot()
+    def mouseRelease(self, ev, scale):
         """When the mouse is clicked on the big label.
 
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent object"""
 
         if self.trayPath is not None:
-            self.cv_impl.mouseRelease(ev, scale)
-        if self.cv_impl.allowEditing():
+            self.cvImpl.mouseRelease(ev, scale)
+        if self.cvImpl.allowEditing():
             self.editMouseRelease()
 
-    def bigLabelScroll(self, ev, scale):
+    @QtCore.Slot()
+    def mouseScroll(self, ev, scale):
         """When the mouse is clicked on the big label.
 
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent object"""
-        self.cv_impl.mouseScroll(ev, scale)
-        if self.cv_impl.allowEditing():
+        self.cvImpl.mouseScroll(ev, scale)
+        if self.cvImpl.allowEditing():
             self.editMouseScroll(ev)
 
     def editMousePress(self, ev):
@@ -369,117 +360,116 @@ class AppData(QtCore.QObject):
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent object"""
 
-        (mx, my) = self.bigMPos
-        c = 15
-        a = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
+        (mx, my) = self.mousePos
+        pad = AppData.BOX_RESIZE_EDGE_PADDING
+        sp = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
 
         if ev.button() == QtCore.Qt.MouseButton.LeftButton:
             if self.selectedEditBox is not None:
                 # If a box is selected, check for clicking on an editable point
                 # (e. corners for resizing, center for panning)
-                p = self.bigMPos
+                p = self.mousePos
                 (x1, y1, x2, y2) =\
-                    self.placedBoxes[self.selectedEditBox].static
-                if ev.button() == QtCore.Qt.MouseButton.LeftButton:
-                    # Process left click
-                    if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
-                        self.placedBoxes.delete(self.selectedEditBox)
-                        self.selectedEditBox = None
+                    self.bugBoxList[self.selectedEditBox].static
 
-                        self.sigDeletedBox.emit(self.selectedEditBox)
-                        self.controlPanel.setCurrentBugId('')
-                    elif pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
-                        self.editAction = AppData.DG_NW
-                    elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
-                        self.editAction = AppData.DG_SE
-                    elif pointInBox(p, (x1-c, y2-c, x1+c, y2+c)):
-                        self.editAction = AppData.DG_SW
-                    elif pointInBox(p, (x2-c, y1-c, x2+c, y1+c)):
-                        self.editAction = AppData.DG_NE
-                    elif pointInBox(p, (x1+c, y1-c, x2-c, y1+c)):
-                        self.editAction = AppData.DG_N
-                    elif pointInBox(p, (x1+c, y2-c, x2-c, y2+c)):
-                        self.editAction = AppData.DG_S
-                    elif pointInBox(p, (x1-c, y1+c, x1+c, y2-c)):
-                        self.editAction = AppData.DG_W
-                    elif pointInBox(p, (x2-c, y1+c, x2+c, y2-c)):
-                        self.editAction = AppData.DG_E
-                    elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
-                        self.editAction = AppData.PAN
+                if Util.pointInBox(p, (x2-3*sp, y1+sp, x2-sp, y1+3*sp)):
+                    self.bugBoxList.delete(self.selectedEditBox)
+                    self.selectedEditBox = None
+                    self.sigDeletedBox.emit(self.selectedEditBox)
+                    self.barcodeEntry.setCurrentBugId("")
+                elif Util.pointInBox(p, (x1-pad, y1-pad, x1+pad, y1+pad)):
+                    self.editAction = AppData.DG_NW
+                elif Util.pointInBox(p, (x2-pad, y2-pad, x2+pad, y2+pad)):
+                    self.editAction = AppData.DG_SE
+                elif Util.pointInBox(p, (x1-pad, y2-pad, x1+pad, y2+pad)):
+                    self.editAction = AppData.DG_SW
+                elif Util.pointInBox(p, (x2-pad, y1-pad, x2+pad, y1+pad)):
+                    self.editAction = AppData.DG_NE
+                elif Util.pointInBox(p, (x1+pad, y1-pad, x2-pad, y1+pad)):
+                    self.editAction = AppData.DG_N
+                elif Util.pointInBox(p, (x1+pad, y2-pad, x2-pad, y2+pad)):
+                    self.editAction = AppData.DG_S
+                elif Util.pointInBox(p, (x1-pad, y1+pad, x1+pad, y2-pad)):
+                    self.editAction = AppData.DG_W
+                elif Util.pointInBox(p, (x2-pad, y1+pad, x2+pad, y2-pad)):
+                    self.editAction = AppData.DG_E
+                elif Util.pointInBox(p, (x1+pad, y1+pad, x2-pad, y2-pad)):
+                    self.editAction = AppData.PAN
 
-                    if self.editAction != AppData.NO_ACTION:
-                        return
+                if self.editAction != AppData.NO_ACTION:
+                    return
 
             # If a box is not selected, check for clicking on a box to
             # to select it
             clickedOn = False
-            for i in range(len(self.placedBoxes)):
-                (x1, y1, x2, y2) = self.placedBoxes[i].static
-                if pointInBox((mx, my), (x1-c, y1-c, x2+c, y2+c)):
+            for i in range(len(self.bugBoxList)):
+                (x1, y1, x2, y2) = self.bugBoxList[i].static
+                if Util.pointInBox((mx, my), (x1-pad, y1-pad, x2+pad, y2+pad)):
                     self.sigSelectedBox.emit(i)
                     clickedOn = True
                     self.selectedEditBox = i
-                    self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
-                    self.sigShowHint.emit(Hints.HINT_EDITBOX)
+                    self.barcodeEntry.setCurrentBugId(self.bugBoxList[i].name)
+                    self.sigShowHint.emit(C.HINT_EDITBOX)
 
             # Check for deselect of box
             if not clickedOn:
                 self.selectedEditBox = None
-                self.sigShowHint.emit(Hints.HINT_REMOVEBUG)
-                self.controlPanel.setCurrentBugId('')
+                self.sigShowHint.emit(C.HINT_REMOVEBUG)
+                self.barcodeEntry.setCurrentBugId("")
         else:
-            box = BugBox("Box " + str(len(self.placedBoxes)),
-                         None,
-                         (mx-3*a, my-3*a, mx+3*a, my+3*a),
-                         (mx, my))
-            self.placedBoxes.newBox(box)
-            self.selectedEditBox = len(self.placedBoxes) - 1
-            self.controlPanel.setCurrentBugId(
-                self.placedBoxes[self.selectedEditBox].name)
+            box = Util.BugBox("Box %s" % str(len(self.bugBoxList)),
+                              None,
+                              (mx-3*sp, my-3*sp, mx+3*sp, my+3*sp),
+                              (mx, my))
+            self.bugBoxList.newBox(box)
+            self.selectedEditBox = len(self.bugBoxList) - 1
+            self.barcodeEntry.setCurrentBugId(
+                self.bugBoxList[self.selectedEditBox].name)
 
     def editMouseMove(self):
         """Called when the application is in edit mode and the mouse is moved
         on the big label."""
 
-        p = self.bigMPos
+        p = self.mousePos
 
         # Show box select cursor if hovered over box
         self.lblBig.setCursor(self.normalCursor)
-        for b in self.placedBoxes:
-            if pointInBox(p, b.static):
+        for b in self.bugBoxList:
+            if Util.pointInBox(p, b.static):
                 self.lblBig.setCursor(self.selectCursor)
 
-        # If box is selected, show various cursors for editing functions
         if self.selectedEditBox is not None:
             if self.editAction == AppData.NO_ACTION:
-                c = 15
-                a = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
+                # If box is selected, show various cursors for editing functions
+                pad = AppData.BOX_RESIZE_EDGE_PADDING
+                sp = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
                 (x1, y1, x2, y2) =\
-                    self.placedBoxes[self.selectedEditBox].static
-                if pointInBox(p, (x2-3*a, y1+a, x2-a, y1+3*a)):
+                    self.bugBoxList[self.selectedEditBox].static
+                if Util.pointInBox(p, (x2-3*sp, y1+sp, x2-sp, y1+3*sp)):
                     self.lblBig.setCursor(self.deleteCursor)
-                elif pointInBox(p, (x1-c, y1-c, x1+c, y1+c)):
+                elif Util.pointInBox(p, (x1-pad, y1-pad, x1+pad, y1+pad)):
                     self.lblBig.setCursor(self.resizeCursorF)
-                elif pointInBox(p, (x2-c, y2-c, x2+c, y2+c)):
+                elif Util.pointInBox(p, (x2-pad, y2-pad, x2+pad, y2+pad)):
                     self.lblBig.setCursor(self.resizeCursorF)
-                elif pointInBox(p, (x1-c, y2-c, x1+c, y2+c)):
+                elif Util.pointInBox(p, (x1-pad, y2-pad, x1+pad, y2+pad)):
                     self.lblBig.setCursor(self.resizeCursorB)
-                elif pointInBox(p, (x2-c, y1-c, x2+c, y1+c)):
+                elif Util.pointInBox(p, (x2-pad, y1-pad, x2+pad, y1+pad)):
                     self.lblBig.setCursor(self.resizeCursorB)
-                elif pointInBox(p, (x1+c, y1-c, x2-c, y1+c)):
+                elif Util.pointInBox(p, (x1+pad, y1-pad, x2-pad, y1+pad)):
                     self.lblBig.setCursor(self.resizeCursorV)
-                elif pointInBox(p, (x1+c, y2-c, x2-c, y2+c)):
+                elif Util.pointInBox(p, (x1+pad, y2-pad, x2-pad, y2+pad)):
                     self.lblBig.setCursor(self.resizeCursorV)
-                elif pointInBox(p, (x1-c, y1+c, x1+c, y2-c)):
+                elif Util.pointInBox(p, (x1-pad, y1+pad, x1+pad, y2-pad)):
                     self.lblBig.setCursor(self.resizeCursorH)
-                elif pointInBox(p, (x2-c, y1+c, x2+c, y2-c)):
+                elif Util.pointInBox(p, (x2-pad, y1+pad, x2+pad, y2-pad)):
                     self.lblBig.setCursor(self.resizeCursorH)
-                elif pointInBox(p, (x1+c, y1+c, x2-c, y2-c)):
+                elif Util.pointInBox(p, (x1+pad, y1+pad, x2-pad, y2-pad)):
                     self.lblBig.setCursor(self.prepanCursor)
             else:
-                (dx, dy) = (self.bigMPos[0] - self.bigMLastPos[0],
-                            self.bigMPos[1] - self.bigMLastPos[1])
-                b = self.placedBoxes[self.selectedEditBox]
+                # If active action, then modify the box
+                (dx, dy) = (self.mousePos[0] - self.lastMousePos[0],
+                            self.mousePos[1] - self.lastMousePos[1])
+                b = self.bugBoxList[self.selectedEditBox]
                 (x1, y1, x2, y2) = b.static
                 newBox = b.static
                 (px, py) = b.point
@@ -513,14 +503,15 @@ class AppData(QtCore.QObject):
                     newPoint = (px + dx, py + dy)
                     self.lblBig.setCursor(self.midpanCursor)
 
-                self.placedBoxes.changeBox(
+                self.bugBoxList.changeBox(
                     self.selectedEditBox, static=newBox, point=newPoint)
 
-        self.bigMLastPos = self.bigMPos
+        self.lastMousePos = self.mousePos
 
     def editMouseRelease(self):
         """Called when the application is in edit mode and the mouse is released
         on the big label."""
+
         if self.editAction != AppData.NO_ACTION and self.selectedEditBox != -1:
             self.sigTransformedBox.emit(self.selectedEditBox)
 
@@ -529,6 +520,7 @@ class AppData(QtCore.QObject):
     def editMouseScroll(self, ev):
         """Called when the application is in edit mode and the mouse is released
         on the big label."""
+
         d = int(math.copysign(1, ev.delta())
                 * math.sqrt(abs(ev.delta()))/self.lblBig.imageScaleRatio)
         if abs(d) < 1:
@@ -536,50 +528,73 @@ class AppData(QtCore.QObject):
 
         if self.selectedEditBox is not None:
             self.sigTransformedBox.emit(self.selectedEditBox)
-            b = self.placedBoxes[self.selectedEditBox]
+            b = self.bugBoxList[self.selectedEditBox]
             (x1, y1, x2, y2) = b.static
             rat = (y2-y1)/float(x2-x1)
             (x1, y1, x2, y2) = (x1-d, y1-int(d*rat), x2+d, y2+int(d*rat))
             (x1, y1, x2, y2) = (min(x1, x2), min(y1, y2),
                                 max(x1, x2), max(y1, y2))
             if abs(x1-x2) > 15 and abs(y1-y2) > 15:
-                self.placedBoxes.changeBox(
+                self.bugBoxList.changeBox(
                     self.selectedEditBox, static=(x1, y1, x2, y2))
 
+    @QtCore.Slot()
     def newBugIdEntered(self, bid):
-        if self.removedBug != -1:
-            self.placedBoxes.changeBox(self.removedBug, name=bid)
-            self.sigShowHint.emit(Hints.HINT_REPLACE_CONTINUE)
-        elif self.selectedEditBox is not None and self.selectedEditBox != -1:
-            self.placedBoxes.changeBox(self.selectedEditBox, name=bid)
+        """This function is called when a new id has been selected for the
+        currently selected bug.
 
+        Keyword Arguments:
+        bid -- the string bug id"""
+
+        if self.removedBug != -1:
+            self.bugBoxList.changeBox(self.removedBug, name=bid)
+            self.sigShowHint.emit(C.HINT_REPLACE_CONTINUE)
+        elif self.selectedEditBox is not None and self.selectedEditBox != -1:
+            self.bugBoxList.changeBox(self.selectedEditBox, name=bid)
+
+    @QtCore.Slot()
     def quit(self):
-        self.logger.stop()
+        """Promtps user to save work, and quits the application"""
+
         exit = self.exportToCSV()
         if exit:
+            self.logger.stop()
             QtCore.QCoreApplication.instance().quit()
 
+    @QtCore.Slot()
     def onBugRemoved(self, i):
+        """Updates the current state when a bug has been removed.
+
+        Keyword Arguments:
+        i -- index in bugBoxList of the recently removed bug"""
         if i != -1:
-            self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+            self.barcodeEntry.setCurrentBugId(self.bugBoxList[i].name)
             self.selectedEditBox = None
         else:
-            self.controlPanel.setCurrentBugId('')
+            self.barcodeEntry.setCurrentBugId("")
 
         self.removedBug = i
 
+    @QtCore.Slot()
     def undoAction(self):
-        if not self.cv_impl.undo():
-            i = self.placedBoxes.undo()
-            self.sigSelectedBox.emit(i)
-            self.selectedEditBox = i
-            if i >= 0 and i < len(self.placedBoxes):
-                self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+        """Process the user's request to undo the previous action."""
 
-    def redoAction(self):
-        if not self.cv_impl.redo():
-            i = self.placedBoxes.redo()
+        # Call cvImpl's undo first. If nothing happens, then undo box actions
+        if not self.cvImpl.undo():
+            i = self.bugBoxList.undo()
             self.sigSelectedBox.emit(i)
             self.selectedEditBox = i
-            if i >= 0 and i < len(self.placedBoxes):
-                self.controlPanel.setCurrentBugId(self.placedBoxes[i].name)
+            if i >= 0 and i < len(self.bugBoxList):
+                self.barcodeEntry.setCurrentBugId(self.bugBoxList[i].name)
+
+    @QtCore.Slot()
+    def redoAction(self):
+        """Process the user's request to redo the previous action."""
+
+        # Call cvImpl's redo first. If nothing happens, then redo box actions
+        if not self.cvImpl.redo():
+            i = self.bugBoxList.redo()
+            self.sigSelectedBox.emit(i)
+            self.selectedEditBox = i
+            if i >= 0 and i < len(self.bugBoxList):
+                self.barcodeEntry.setCurrentBugId(self.bugBoxList[i].name)
