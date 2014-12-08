@@ -1,4 +1,4 @@
-Insect Digitization Witness Cam App
+Insect Digitization WitnessCam Application
 ===================================
 
 This application hopes to make the process of attaching a barcode to pinned
@@ -34,13 +34,15 @@ manager, though the commands and package names will differ.
 How to use
 ----------
 
-Start the application by executing:
+Start the application by executing the following command, optionally providing
+a file for logging output:
 ```bash
-$ python2.7 main.py
+$ python2.7 main.py <logfile>
 ```
 
 ### Load tray scan and setup
-Click the **Load Tray Scan** button to open an image of a tray. This will also
+Click **File > Load Tray Scan** to open an image of a tray, or drag and
+drop the image into the application window. This will also
 start the witness camera. Be sure that the witness camera is set as the default
 system camera, so that the application will automatically use the witness
 camera.
@@ -48,27 +50,34 @@ camera.
 The camera view will be displayed in the big box. Position the actual insect
 tray (corresponding to the loaded image) in clear view of the camera. Now click
 on the four corners of the tray in the camera view starting from the top left
-corner of the tray in the scanned image. This is very important (Include
-image). Upon each click a small circle will be placed at each corner.
+corner of the tray in the scanned image. This is very important. 
+Upon each click a small circle will be placed at each corner.
 
 Once all four corners are clicked, the scan of the tray will be placed in the
-big box, and the camera view will be moved to the small box, and turn black.
+big box, and the camera view will be moved to the small box. In the small box,
+the outline of the tray area you selected will be shown with a blue trace.
+
+### Calibration Phase
+One the tray area has been selected, a new window will pop up and ask you
+to calibrate the vision system. The instructions will be displayed on a button
+in the calibration window. Once the calibration is done, certain constants will
+be calculated (constants described at the end). You can still change the
+constants manually after calibration.
 
 
 ### Scanning process
-When the tray scan is shown on in the big view, the scanning process has
-started. When you remove an insect from the tray and completely out of view of
+When you remove an insect from the tray and completely out of view of
 the camera, the system will determine which insect was removed, and mark it
 with a blue circle and X. This indicates that this is the removed insect. When
 this happens, you can modify the **ID** in the text box, and the changes will
-automatically be applied to that insect. 
+automatically be applied to that insect.
 
 If the barcode scanner is plugged in and can act as a keyboard device, then
 simply scanning the barcode will be enough. The **ID** text box should
 automatically focus every time a bug is removed.
 
 Once the barcode has been entered, attach the barcode to the pin, and replace
-the insect back on the try where it was before.
+the insect back on the try exactly where it was before.
 
 Now this process can be repeated for each insect.
 
@@ -86,9 +95,11 @@ The following editing options are supported:
 - **Move**: The marker and box can be moved by dragging from the inside of the
   box
 - **Resize**: The box can be resized by dragging the corners or edges of the
-  box
+  box. The box can also be grown or shrunk by scrolling
 - **Delete**: The box and marker can be deleted by right clicking on the
   selected marker
+- **Manually Create**: Right clicking anywhere on the image will create a
+  square box, that can be manually placed on top of a bug
 - **Change ID**: The ID of the selected bug/marker is displayed in the **ID**
   text box. Changing the contained text will change the ID associated with that
   marker
@@ -101,12 +112,16 @@ section).
 
 Another option to fix recognition errors is to make sure all bugs are back on
 the tray, and make sure nothing is obscuring the view of the tray. Then click
-the **Refresh Camera** button. This will recalibrate the background, and
+**Image > Refresh Camera**. This will recalibrate the background, and
 hopefully fix any errors.
 
-### Exporting the scanning data
-The data from the scanning process can be exported at any time. By clicking the
-**Export CSV**, a csv (comma separated value) file can be written. It could
+If you have a good understanding of the system internals, then it is also
+possible to manually change the configuration constants in the configuration
+window.
+
+### Exporting the scanned data
+The data from the scanning process can be exported at any time. By clicking
+**File > Export CSV**, a csv (comma separated value) file can be written. It could
 look something like this:
 
 ```
@@ -137,8 +152,9 @@ This should only be done if the application is routinely under performing, such
 as mis-recognizing operators hand's for removed bugs, or if the camera is
 particularly noisy and a bug is never recognized as being removed.
 
-In **AppData.py** starting at line 30, there are several constants used in the
+In **WitnessCam.py** starting at line 46, there are several constants used in the
 vision process. These control aspects such as error tolerance and waiting time.
+A few of these are set at runtime by the calibration process.
 
 - **ACTION_DELAY**: (integer greater than 1) The number of camera frames with
   no motion the algorithm waits for before taking the next action

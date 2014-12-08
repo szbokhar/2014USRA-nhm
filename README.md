@@ -2,7 +2,7 @@ README
 ======
 
 This project contains my work with Prof. Michael Terry during my Winter 2014
-Undergraduate Research Assistantship.
+Undergraduate Research Assistantship and Fall 2014 NSERC Co-op.
 
 The goal of this project was to design an easy to use system for automatically
 cropping insect specimens in large images containing ~10-100 insects, and
@@ -27,4 +27,10 @@ This folder contains a user friendly GUI application to crop the insects in the
 loaded image. It implements the variation of the algorithm that has the user
 select one example, and click on every other insect.
 
-Start the program with `python seg.py <logfile>`
+Start the program with `python2.7 seg.py <logfile>`
+
+The python folder also contains work on the witnesscam workflow for attaching
+barcodes to the insect specimens. this is contained in the `witnesscam_gui`
+folder.
+
+Start the program with `python2.7 main.py <logfile>`
