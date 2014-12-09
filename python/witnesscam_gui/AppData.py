@@ -274,7 +274,7 @@ class AppData(QtCore.QObject):
                             % str(os.path.split(self.csvPath)[1]))
         else:
             message.setText(C.DIALOG_SAVE
-                            % str(os.path.split(self.csvPath)))
+                            % str(os.path.split(self.csvPath)[1]))
 
         message.setStandardButtons(
             QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard

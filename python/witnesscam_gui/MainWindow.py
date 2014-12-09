@@ -128,7 +128,7 @@ class MainWindow(QtGui.QMainWindow):
         # Finish up window
         self.setAcceptDrops(True)
         self.statusBar().showMessage(C.WINDOW_STATUS_READY)
-        self.setGeometry(0, 0, self.originalSize[0], self.originalSize[1])
+        self.setGeometry(100, 100, self.originalSize[0], self.originalSize[1])
         self.setWindowTitle(C.WINDOW_TITLE)
         self.show()
         self.raise_()
