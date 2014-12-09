@@ -123,7 +123,7 @@ class FileBrowser(QtGui.QFrame):
         current_path -- path of the directory to display in the file browser
         image_filename -- filename of the currently loaded image"""
 
-        self.current_path = current_path
+        self.currentPath = current_path
         self.image_filename = image_filename
 
         # Build list of image files in the directory
@@ -140,7 +140,7 @@ class FileBrowser(QtGui.QFrame):
 
         # Populate tree widget with new contents
         for f in images:
-            csvfile = current_path+"/"+changeExtension(f, 'csv')
+            csvfile = os.path.join(current_path, changeExtension(f, 'csv'))
             count = 'n/a'
 
             if os.path.isfile(csvfile):
@@ -183,21 +183,22 @@ class FileBrowser(QtGui.QFrame):
         """Called when the user double clicks an entry in the file browser"""
 
         if self.currentItem is not i:
-            self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
+            print(self.currentPath, i.text(0))
+            self.sigFileSelected.emit(os.path.join(self.currentPath, i.text(0)))
 
     @QtCore.Slot()
     def nextClicked(self):
         """Called when the user clicks the next button under the filebrowser"""
 
         i = self.treeFileBrowser.itemBelow(self.currentItem)
-        self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
+        self.sigFileSelected.emit(os.path.join(self.currentPath, i.text(0)))
 
     @QtCore.Slot()
     def previousClicked(self):
         """Called when the user clicks the prev button under the filebrowser"""
 
         i = self.treeFileBrowser.itemAbove(self.currentItem)
-        self.sigFileSelected.emit("%s/%s" % (self.currentPath, i.text(0)))
+        self.sigFileSelected.emit(os.path.join(self.currentPath, i.text(0)))
 
 
 class BigLabel(QtGui.QLabel):

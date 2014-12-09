@@ -159,7 +159,7 @@ class AppData(QtCore.QObject):
 
                     self.window.statusBar().showMessage(
                         "Also loaded CSV file: %s" %
-                        str(csv_fname.split("/")[-1]))
+                        str(os.path.split(csv_fname)[1]))
                     self.logger.log(
                         "LOAD found corresponding csv file %s"
                         % self.csvPath, 1)
@@ -167,7 +167,7 @@ class AppData(QtCore.QObject):
                     QtGui.QMessageBox.information(
                         self.window, "Error Reading CSV",
                         "It seems the file %s id badly formatted. Cannot load."
-                        % str(csv_fname.split("/")[-1]))
+                        % str(os.path.split(csv_fname)[1]))
 
         # Start the camera loop
         self.startCameraFeed()
@@ -271,10 +271,10 @@ class AppData(QtCore.QObject):
         message = QtGui.QMessageBox()
         if os.path.isfile(self.csvPath):
             message.setText(C.DIALOG_OVERWRITE
-                            % str(self.csvPath.split("/")[-1]))
+                            % str(os.path.split(self.csvPath)[1]))
         else:
             message.setText(C.DIALOG_SAVE
-                            % str(self.csvPath.split("/")[-1]))
+                            % str(os.path.split(self.csvPath)))
 
         message.setStandardButtons(
             QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard
@@ -290,7 +290,7 @@ class AppData(QtCore.QObject):
                         str(b.getStaticBox())[1:-1] + ", " +
                         str(b.getPoint())[1:-1] + "\n")
             self.window.statusBar().showMessage(
-                "Saved data to %" % str(self.csvPath.split("/")[-1]))
+                "Saved data to %s" % str(os.path.split(self.csvPath)[1]))
             return True
         elif ret == QtGui.QMessageBox.Discard:
             return True

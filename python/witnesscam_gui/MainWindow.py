@@ -152,7 +152,7 @@ class MainWindow(QtGui.QMainWindow):
         if os.path.isfile(C.FILENAME_RECENT_LOADS):
             with open(C.FILENAME_RECENT_LOADS, 'r') as recent_file:
                 for path in recent_file.readlines():
-                    fname = path.split('/')[-1]
+                    fname = os.path.split(path)[1]
                     recentMenu.addAction(
                         fname, partial(self.selectTrayImage, path[0:-1]))
         fileMenu.addSeparator()
@@ -227,11 +227,9 @@ class MainWindow(QtGui.QMainWindow):
         # Extract filename, directory path, and associated csv filename
         if fname != '':
             self.logger.log('LOAD by File menu', 1)
-            fpath = fname.split('/')
-            self.currentPath = '/'.join(fpath[0:-1])
-            csvfile = changeExtension(fpath[-1], 'csv')
-            csvfile = self.currentPath+'/'+csvfile
-            self.imageFilename = fpath[-1]
+            (self.currentPath, self.imageFilename) = os.path.split(fname)
+            csvfile = changeExtension(self.imageFilename, 'csv')
+            csvfile = os.path.join(self.currentPath, csvfile)
 
             # Boradcast that user has loaded a file
             self.sigLoadTrayImage.emit(fname, csvfile)
