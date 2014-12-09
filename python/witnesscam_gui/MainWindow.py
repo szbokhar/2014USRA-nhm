@@ -280,7 +280,7 @@ class MainWindow(QtGui.QMainWindow):
         # If the mimetype is correct, try to load the image
         if ev.mimeData().hasUrls():
             self.logger.log('LOAD by drag and drop', 1)
-            self.selectTrayImage(ev.mimeData().urls()[0].path())
+            self.selectTrayImage(ev.mimeData().urls()[0].toLocalFile())
 
     def eventFilter(self, obj, event):
         """Event filter designed to capture undo events directed towards the
