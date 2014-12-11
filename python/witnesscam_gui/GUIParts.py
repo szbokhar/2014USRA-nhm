@@ -18,8 +18,9 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 
 from PySide import QtCore, QtGui
-from os import listdir
 from mimetypes import guess_type
+from math import log, ceil
+from os import listdir
 import cv2
 import numpy as np
 
@@ -405,4 +406,149 @@ class SmallLabel(QtGui.QLabel):
         (w, h) = self.originalSize
         img = np.zeros((h, w, 4), np.uint8)
         img[:, :, :] = [128, 128, 128, 128]
+        self.setImage(img)
+
+
+class SimplePlotter(QtGui.QHBoxLayout):
+    """Widget that plots a variaable's value as a line graph over time"""
+
+    POS, POSNEG = range(2)
+
+    def __init__(self, name, tp=POS, min_height=1, data_span=40, parent=None):
+        """Constructor
+
+        Keyword Arguments:
+        name -- name of the variable to be displayed in the label
+        tp -- the type of plot
+              SimplePlotter.POS - Positive values only
+              SimplePlotter.POSNEG - Positive or negative values
+        min_height -- minimum height of  the plot
+        data_span -- number of data points to display"""
+
+        super(SimplePlotter, self).__init__(parent)
+
+        self.name = name
+        self.data = []
+        self.dataSpan = data_span
+        self.graphType = tp
+        self.minHeight = min_height
+        self.thresholds = []
+        self.initUI()
+
+    def initUI(self):
+        # Create the Textbox label
+        self.lblText = QtGui.QLabel()
+        self.lblText.setText(self.name)
+
+        self.lblGraph = QtGui.QLabel("temp")
+
+        # Place all buttons and labels on the panel
+        self.addWidget(self.lblText)
+        self.addWidget(self.lblGraph)
+
+    def updateValue(self, val):
+        """Add a new value to the timeseries"""
+
+        self.data.append(val)
+        if len(self.data) > self.dataSpan:
+            del self.data[0]
+        self.lblText.setText("%s: \n %f" % (self.name, val))
+        self.generateGraph()
+
+    def setName(self, name):
+        """Set the name to be displayed in the label"""
+
+        self.name = name
+        self.lblText.setText(self.name)
+
+    def setThresholds(self, thresh):
+        """Set list of threhsolds to be drawn on the plot
+
+        Keyword Arguments:
+        threhsh -- list of pairs (t, c) where t is the threshold value and c is
+                   the color of the line to draw"""
+        self.thresholds = thresh
+
+    def setImage(self, cv_image):
+        """Displays an image in the label.
+
+        Keyword Arguments:
+        cv_image -- OpenCV2 image, represented as a numpy array"""
+
+        if cv_image.ndim == 2:
+            cv_image = cv2.cvtColor(cv_image, cv2.cv.CV_GRAY2BGR)
+        originalSize = (cv_image.shape[1], cv_image.shape[0])
+        img = QtGui.QImage(cv_image, cv_image.shape[1], cv_image.shape[0],
+                           cv_image.strides[0], QtGui.QImage.Format_RGB888)
+
+        self.lblGraph.setPixmap(QtGui.QPixmap.fromImage(img))
+
+    def setDataSpan(self, ds):
+        """Set the number of data points to keep and plot"""
+
+        self.dataSpan = ds
+
+    def generateGraph(self):
+        """Geneate the image to be displayed when the label is created. For the
+        big label, this is a dashed border with a message to drag and drop a
+        file to load it."""
+
+        # Set up initial white image
+        s = self.lblGraph.size()
+        img = np.zeros((max(s.height()-20, 20), max(s.width()-20, 100), 3),
+                       np.uint8)
+        (h,w,d) = img.shape
+        img[:, :, :] = [255, 255, 255]
+
+        # Draw axis
+        cv2.line(img, (10,0), (10,h), C.BLACK, 1)
+        high = 1
+        low = 0
+        if self.graphType == SimplePlotter.POS:
+            cv2.line(img, (0,h-10), (w,h-10), C.BLACK, 1)
+            high = max(self.data)
+            def toPlot(val):
+                return (val-low)/float(high-low)*(h-10)
+        elif self.graphType == SimplePlotter.POSNEG:
+            cv2.line(img, (0,h/2), (w,h/2), C.BLACK, 1)
+            high = max(map(abs, self.data))
+            def toPlot(val):
+                return (val-low)/float(high-low)*(h/2.0)
+
+        # Set height of the plot
+        if high == 0:
+            high = self.minHeight
+        else:
+            high = max(pow(10, ceil(log(high, 10))), self.minHeight)
+
+        # Draw text showing height of the plot
+        s = (cv2.FONT_HERSHEY_SIMPLEX, 0.5)
+        ((tw, th), base) = cv2.getTextSize(str(high), s[0], s[1], 1)
+        cv2.putText(img, str(high), (10, th), s[0], s[1], (0,0,0), 1)
+
+        # Draw data on plot
+        xv = w
+        dx = float(w-10)/(self.dataSpan-1)
+        for i in range(len(self.data)-1, 0, -1):
+            if self.graphType == SimplePlotter.POS:
+                p1 = (int(xv), h-10-int(toPlot(self.data[i])))
+                p2 = (int(xv-dx), h-10-int(toPlot(self.data[i-1])))
+            elif self.graphType == SimplePlotter.POSNEG:
+                p1 = (int(xv), h/2-int(toPlot(self.data[i])))
+                p2 = (int(xv-dx), h/2-int(toPlot(self.data[i-1])))
+
+            cv2.line(img, p2, p1, C.RED, 1)
+            xv -= dx
+
+        # Draw threhsolds on plot
+        for (t,c) in self.thresholds:
+            if self.graphType == SimplePlotter.POS:
+                v = h-10-int(toPlot(t))
+            elif self.graphType == SimplePlotter.POSNEG:
+                v = h/2-int(toPlot(t))
+                cv2.line(img, (10, v), (w, v), c)
+                v = -v
+            cv2.line(img, (10, v), (w, v), c)
+
+        # Apply image
         self.setImage(img)

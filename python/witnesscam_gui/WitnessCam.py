@@ -24,6 +24,7 @@ import cv2
 
 from Pt import *
 from Util import *
+from GUIParts import SimplePlotter
 import Constants as C
 
 
@@ -686,10 +687,22 @@ class WitnessCam(QtCore.QObject):
             self.txtAction.setValidator(QtGui.QDoubleValidator())
             self.txtAction.setEnabled(False)
 
-            self.lblStableRun = QtGui.QLabel()
-            self.lblStableBoxRun = QtGui.QLabel()
-            self.lblDiffVal = QtGui.QLabel()
-            self.lblDeltaVal = QtGui.QLabel()
+            self.lblStableRun = SimplePlotter(
+                "stableRun", SimplePlotter.POS, WitnessCam.ACTION_DELAY)
+            self.lblStableBoxRun = SimplePlotter(
+                "stableBoxRun", SimplePlotter.POS, WitnessCam.ACTION_DELAY)
+            self.lblDiffVal = SimplePlotter(
+                "activeFrameCurrentDiff", SimplePlotter.POS, 1)
+            self.lblDeltaVal = SimplePlotter(
+                "activeFrameSmoothDelta", SimplePlotter.POSNEG, 1)
+            self.lblStableRun.setThresholds([(WitnessCam.ACTION_DELAY, C.BLUE)])
+            self.lblStableBoxRun.setThresholds(
+                [(WitnessCam.ACTION_DELAY, C.BLUE)])
+            self.lblDiffVal.setThresholds(
+                [(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD, C.BLUE)])
+            self.lblDeltaVal.setThresholds(
+                [(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD, C.BLUE)])
+
 
             mainContent.addWidget(self.btnNext, 0, 0, 1, 2)
             mainContent.addWidget(self.lblActDelay, 1, 0)
@@ -698,14 +711,11 @@ class WitnessCam(QtCore.QObject):
             mainContent.addWidget(self.txtDelta, 2, 1)
             mainContent.addWidget(self.lblAction, 3, 0)
             mainContent.addWidget(self.txtAction, 3, 1)
-            mainContent.addWidget(QtGui.QLabel('stableRun: '), 4, 0)
-            mainContent.addWidget(self.lblStableRun, 4, 1)
-            mainContent.addWidget(QtGui.QLabel('stableBoxRun: '), 5, 0)
-            mainContent.addWidget(self.lblStableBoxRun, 5, 1)
-            mainContent.addWidget(QtGui.QLabel('currentDiff: '), 6, 0)
-            mainContent.addWidget(self.lblDiffVal, 6, 1)
-            mainContent.addWidget(QtGui.QLabel('currentDelta: '), 7, 0)
-            mainContent.addWidget(self.lblDeltaVal, 7, 1)
+            mainContent.addLayout(self.lblStableRun, 4, 0, 1, 2)
+            mainContent.addLayout(self.lblStableBoxRun, 5, 0, 1, 2)
+            mainContent.addLayout(self.lblDiffVal, 6, 0, 1, 2)
+            mainContent.addLayout(self.lblDeltaVal, 7, 0, 1, 2)
+
 
             self.setLayout(mainContent)
 
@@ -715,7 +725,7 @@ class WitnessCam(QtCore.QObject):
             self.txtDelta.textChanged.connect(partial(self.textChanged, 1))
             self.txtAction.textChanged.connect(partial(self.textChanged, 2))
 
-            self.resize(250, 150)
+            self.setGeometry(50, 50, 300, 600)
             self.setWindowTitle('Calibration')
             self.show()
 
@@ -769,16 +779,24 @@ class WitnessCam(QtCore.QObject):
         def updateValues(self, srun, sbrun, diff, delta):
             self.diffValues.append(diff)
             self.deltaValues.append(delta)
-            self.lblStableRun.setText(str(srun))
-            self.lblStableBoxRun.setText(str(sbrun))
-            self.lblDiffVal.setText(str(diff))
-            self.lblDeltaVal.setText(str(delta))
+            self.lblStableRun.updateValue(srun)
+            self.lblStableBoxRun.updateValue(sbrun)
+            self.lblDiffVal.updateValue(diff)
+            self.lblDeltaVal.updateValue(delta)
 
         def textChanged(self, config, val):
             self.data.refreshCamera()
             if config == 0:
                 WitnessCam.ACTION_DELAY = int(val)
+                self.lblStableRun.setThresholds(
+                    [(WitnessCam.ACTION_DELAY, C.BLUE)])
+                self.lblStableBoxRun.setThresholds(
+                    [(WitnessCam.ACTION_DELAY, C.BLUE)])
             elif config == 1:
                 WitnessCam.STABLE_FRAME_DELTA_THRESHOLD = float(val)
+                self.lblDiffVal.setThresholds(
+                    [(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD, C.BLUE)])
             elif config == 2:
                 WitnessCam.STABLE_FRAME_ACTION_THRESHOLD = float(val)
+                self.lblDeltaVal.setThresholds(
+                    [(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD, C.BLUE)])
