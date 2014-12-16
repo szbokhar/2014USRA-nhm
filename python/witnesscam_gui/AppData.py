@@ -18,6 +18,7 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 
 from PySide import QtCore, QtGui
+from time import time, sleep
 import cv2
 import csv
 import numpy as np
@@ -46,8 +47,9 @@ class AppData(QtCore.QObject):
     CAM_MAX_WIDTH = 640
     CAM_MAX_HEIGHT = 480
     BOX_RESIZE_EDGE_PADDING = 15
+    FPS_TARGET = 60
 
-    def __init__(self, win, cv_impl, logger):
+    def __init__(self, win, cv_impl, logger, testdata=None):
         """Initializes member variables for use in later functions"""
 
         super(AppData, self).__init__()
@@ -55,6 +57,7 @@ class AppData(QtCore.QObject):
         self.window = win
         self.cvImpl = cv_impl
         self.logger = logger
+        self.testdata = testdata
 
         # Labels for displaying images
         self.barcodeEntry = None
@@ -83,7 +86,6 @@ class AppData(QtCore.QObject):
         self.logger = logger
         self.logger.log("INIT AppData", 0)
 
-        self.reset()
 
     def reset(self):
         """Reset internal attributes"""
@@ -103,6 +105,7 @@ class AppData(QtCore.QObject):
         # Show Hint
         self.sigShowHint.emit(C.HINT_LOADFILE)
 
+
         self.logger.log("RESET AppData", 0)
 
     def setGuiElements(self, barcode, big, small):
@@ -119,6 +122,10 @@ class AppData(QtCore.QObject):
         self.lblSmall = small
 
         self.sigShowHint.emit(C.HINT_LOADFILE)
+
+        self.reset()
+        if self.testdata is not None:
+            self.loadTrayImage(self.testdata.trayfile, self.testdata.csvfile)
 
     @QtCore.Slot()
     def loadTrayImage(self, image_fname, csv_fname):
@@ -179,11 +186,20 @@ class AppData(QtCore.QObject):
         """Begin the camera feed and set up the timer loop."""
 
         if not self.camOn:
-            self.capture = cv2.VideoCapture(0)
+            if self.testdata is not None:
+                self.capture = cv2.VideoCapture(self.testdata.camfile)
+            else:
+                self.capture = cv2.VideoCapture(0)
 
             self.frameTimer = QtCore.QTimer()
-            self.frameTimer.timeout.connect(self.getNewCameraFrame)
-            self.frameTimer.start(30)
+            self.frameTimer.timeout.connect(self.grabNewCameraFrame)
+            self.frameTimer.start(1000/AppData.FPS_TARGET)
+
+            self.loopTimer = QtCore.QTimer()
+            self.loopTimer.timeout.connect(self.getNewCameraFrame)
+            self.loopTimer.setSingleShot(True)
+            self.loopTimer.start(1000/AppData.FPS_TARGET)
+
             self.camOn = True
             self.logger.log("INIT camera", 0)
 
@@ -193,10 +209,16 @@ class AppData(QtCore.QObject):
         to on screen."""
 
         # Get new camera frame and downsample it
-        (_, self.cameraImage) = self.capture.read()
+        (_, self.cameraImage) = self.capture.retrieve()
+        if self.cameraImage is None:
+            print('No Frame')
+            return
+
         while (self.cameraImage.shape[0] > AppData.CAM_MAX_HEIGHT or
                self.cameraImage.shape[1] > AppData.CAM_MAX_WIDTH):
             self.cameraImage = cv2.pyrDown(self.cameraImage)
+
+        start_time = time()
 
         # Process and modify the camera and static frames
         (big_image, small_image, self.bugBoxList) = self.cvImpl.amendFrame(
@@ -210,6 +232,12 @@ class AppData(QtCore.QObject):
         # Display the modified frame to the user
         self.lblBig.setImage(big_image)
         self.lblSmall.setImage(small_image)
+
+        end_time = time()
+        self.loopTimer.start(max(0, 1.0/AppData.FPS_TARGET-(end_time-start_time)))
+
+    def grabNewCameraFrame(self):
+        self.capture.grab()
 
     def setMousepos(self, x, y):
         """Update the current mouse position"""
@@ -261,26 +289,27 @@ class AppData(QtCore.QObject):
                 cv2.line(image, (px+a, py), (px-a, py), col, t)
                 cv2.circle(image, (px, py), a, col, t)
 
-    def exportToCSV(self):
+    def exportToCSV(self, ask_save=True):
         """Exports the bugBoxList data to a CSV file"""
 
         if self.csvPath is None or self.csvPath == "":
             return True
 
         ret = QtGui.QMessageBox.Save
-        message = QtGui.QMessageBox()
-        if os.path.isfile(self.csvPath):
-            message.setText(C.DIALOG_OVERWRITE
-                            % str(os.path.split(self.csvPath)[1]))
-        else:
-            message.setText(C.DIALOG_SAVE
-                            % str(os.path.split(self.csvPath)[1]))
+        if ask_save:
+            message = QtGui.QMessageBox()
+            if os.path.isfile(self.csvPath):
+                message.setText(C.DIALOG_OVERWRITE
+                                % str(os.path.split(self.csvPath)[1]))
+            else:
+                message.setText(C.DIALOG_SAVE
+                                % str(os.path.split(self.csvPath)[1]))
 
-        message.setStandardButtons(
-            QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard
-            | QtGui.QMessageBox.Cancel)
-        message.setDefaultButton(QtGui.QMessageBox.Save)
-        ret = message.exec_()
+            message.setStandardButtons(
+                QtGui.QMessageBox.Save | QtGui.QMessageBox.Discard
+                | QtGui.QMessageBox.Cancel)
+            message.setDefaultButton(QtGui.QMessageBox.Save)
+            ret = message.exec_()
 
         if ret == QtGui.QMessageBox.Save:
             f = open(self.csvPath, "w")

@@ -214,7 +214,7 @@ class BigLabel(QtGui.QLabel):
     sigMouseRelease = QtCore.Signal(QtGui.QMouseEvent, float)
     sigScroll = QtCore.Signal(QtGui.QWheelEvent, float)
 
-    def __init__(self, data, parent=None):
+    def __init__(self, data, logger, parent=None):
         """Object constructor
 
         Keyword Arguments
@@ -228,6 +228,7 @@ class BigLabel(QtGui.QLabel):
         # self.setPixmap(QtGui.QPixmap(self.originalSize[0],
         #                              self.originalSize[1]))
         self.generateInitialImage()
+        self.logger = logger
 
     def initUI(self):
         self.setAlignment(QtCore.Qt.AlignTop)
@@ -262,6 +263,7 @@ class BigLabel(QtGui.QLabel):
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent"""
 
+        self.logger.log("MOUSEPRESS on BigLabel at (%d, %d)" % (ev.x(), ev.y()), 0)
         self.sigMousePress.emit(ev, self.imageScaleRatio)
 
     def mouseMoveEvent(self, ev):
@@ -278,6 +280,7 @@ class BigLabel(QtGui.QLabel):
         Keyword Arguments:
         ev -- PySide.QtGui.QMouseEvent"""
 
+        self.logger.log("MOUSERELEASE on BigLabel at (%d, %d)" % (ev.x(), ev.y()), 0)
         self.sigMouseRelease.emit(ev, self.imageScaleRatio)
 
     def wheelEvent(self, ev):
@@ -516,7 +519,7 @@ class SimplePlotter(QtGui.QHBoxLayout):
                 return (val-low)/float(high-low)*(h/2.0)
 
         # Set height of the plot
-        if high == 0:
+        if high <= 0:
             high = self.minHeight
         else:
             high = max(pow(10, ceil(log(high, 10))), self.minHeight)

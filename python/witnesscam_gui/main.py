@@ -18,6 +18,7 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 
 import sys
+import os
 
 from MainWindow import *
 from WitnessCam import *
@@ -25,15 +26,31 @@ from Util import InteractionLogger
 
 def main():
     logfile = None
-    if len(sys.argv) > 1:
-        logfile = sys.argv[1]
+    testfile = None
+
+    i = 0
+    while i < len(sys.argv):
+        if sys.argv[i] == '-l':
+            logfile = sys.argv[i+1]
+            i += 2
+        elif sys.argv[i] == '-t':
+            testfile = sys.argv[i+1]
+            i += 2
+        else:
+            i += 1
 
     logger = InteractionLogger(logfile)
     logger.start()
+    tester = TestingData.loadTestingFile(testfile)
     app = QtGui.QApplication(sys.argv)
-    wc = WitnessCam(logger)
-    ex = MainWindow(wc, logger)
-    sys.exit(app.exec_())
+    wc = WitnessCam(logger, tester)
+    ex = MainWindow(wc, logger, tester)
+
+    if tester is not None and tester.automate:
+        tester.setMainTestingWindow(ex)
+        tester.runtest()
+    else:
+        sys.exit(app.exec_())
 
 if __name__ == '__main__':
     main()

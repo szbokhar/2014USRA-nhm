@@ -1,0 +1,25 @@
+{
+    "automate": true,
+    "camfile":
+        "/Users/szbokhar/Coding/naturalhistorymuseum/python/witnesscam_gui/1.mp4",
+    "trayfile":
+        "/Users/szbokhar/Coding/naturalhistorymuseum/python/witnesscam_gui/1.png",
+    "csvfile":
+        "/Users/szbokhar/Coding/naturalhistorymuseum/python/witnesscam_gui/1.csv",
+    "check-csvfile":
+        "/Users/szbokhar/Coding/naturalhistorymuseum/python/witnesscam_gui/1check.csv",
+    "traycorners": [
+        [495, 32],
+        [131, 12],
+        [31, 309],
+        [533, 357]
+    ],
+    "calibration": [
+        4000,
+        5800,
+        5300,
+        7800,
+        24600
+    ],
+    "rununtil": 60000
+}

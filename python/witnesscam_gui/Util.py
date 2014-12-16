@@ -19,6 +19,10 @@
 
 from Pt import *
 from time import time
+from PySide import QtTest, QtCore
+import json
+import os
+import csv
 
 
 def computeImageScaleFactor(original, box):
@@ -143,7 +147,7 @@ def triangleArea(points):
     area -- a float representing the area of the quadrilateral"""
 
     [(x0, y0), (x1, y1), (x2, y2)] = points
-    return 0.5*(x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1))
+    return abs(0.5*(x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1)))
 
 
 def findWeightedMedianPoint2D(image, roi):
@@ -512,6 +516,12 @@ class BugBoxList:
         """Returns the length of the list"""
         return len(self.boxes)
 
+    def __str__(self):
+        return str(self.boxes)
+
+    def __repr__(self):
+        return str(self)
+
     def delete(self, index):
         """Deletes the box at the index position from the list.
 
@@ -633,6 +643,7 @@ class InteractionLogger:
             self.loggingFile = open(self.filename, 'w')
 
     def stop(self):
+        self.log("EXIT logger")
         if self.loggingFile is not None:
             self.loggingFile.close()
 
@@ -641,3 +652,76 @@ class InteractionLogger:
                 and any(map(lambda x: x == level, self.logLevels)):
             self.loggingFile.write(
                 str(time() - self.startTime) + " " + string + "\n")
+
+class TestingData:
+    @staticmethod
+    def loadTestingFile(testfile):
+        if testfile is not None:
+            with open(testfile, 'r') as f:
+                jd = json.loads(f.read())
+                return TestingData(jd)
+        else:
+            return None
+
+    def __init__(self, automate, cam, tray, csv, check, corners, calibration, rununtil):
+        self.automate = automate
+        self.camfile = cam
+        self.trayfile = tray
+        self.csvfile = csv
+        self.checkcsvfile = check
+        self.traycorners = corners
+        self.calibration = calibration
+        self.rununtil = rununtil
+
+    def __init__(self, jd):
+        self.automate = jd['automate']
+        self.camfile = jd['camfile']
+        self.trayfile = jd['trayfile']
+        self.csvfile = jd['csvfile']
+        self.checkcsvfile = jd['check-csvfile']
+        self.traycorners = jd['traycorners']
+        self.calibration = jd['calibration']
+        self.rununtil = jd['rununtil']
+
+
+    def setMainTestingWindow(self, win):
+        self.window = win
+
+    def runtest(self):
+        w = self.window
+        for [x,y] in self.traycorners:
+            QtTest.QTest.mouseClick(
+                w.lblBig, QtCore.Qt.LeftButton, pos=QtCore.QPoint(x,y),
+                delay=500)
+
+        for t in self.calibration:
+            QtTest.QTest.mouseClick(
+                w.cvImpl.calibrate.btnNext, QtCore.Qt.LeftButton, delay=t)
+
+        QtTest.QTest.mouseClick(
+            w.lblBig, QtCore.Qt.LeftButton, delay=self.rununtil)
+
+        # w.data.exportToCSV(False)
+
+        current_boxes = w.data.bugBoxList
+        check_boxes = self.loadCSVBoxes(self.checkcsvfile)
+        print(current_boxes)
+        print(check_boxes)
+
+    def loadCSVBoxes(self, csv_fname):
+        boxes = None
+        print(csv_fname)
+        if os.path.isfile(csv_fname):
+            with open(csv_fname) as csvfile:
+                reader = csv.reader(csvfile)
+                boxes = BugBoxList()
+
+                if (reader.next()[1] == " Rectangle x1"):
+                    for b in reader:
+                        box = BugBox(
+                            b[0], None,
+                            (int(b[1]), int(b[2]), int(b[3]), int(b[4])),
+                            (int(b[5]), int(b[6])))
+                        boxes.newBox(box)
+
+        return boxes

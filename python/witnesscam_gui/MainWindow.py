@@ -34,7 +34,7 @@ class MainWindow(QtGui.QMainWindow):
     sigRedoAction = QtCore.Signal()
     sigQuitAction = QtCore.Signal()
 
-    def __init__(self, cv_impl, logger):
+    def __init__(self, cv_impl, logger, testdata):
         """Main window constructor.
 
         Keyword Arguments:
@@ -43,6 +43,8 @@ class MainWindow(QtGui.QMainWindow):
 
         super(MainWindow, self).__init__()
         self.logger = logger
+        self.testdata = testdata
+        self.cvImpl = cv_impl
         cv_impl.setMainWindow(self)
         self.initUI(cv_impl)
 
@@ -63,9 +65,9 @@ class MainWindow(QtGui.QMainWindow):
         interactionContent = QtGui.QVBoxLayout()
 
         # Setup Gui Elements
-        self.data = AppData(self, cv_impl, self.logger)
+        self.data = AppData(self, cv_impl, self.logger, self.testdata)
         self.controlPanel = BarcodeEntry(self.data)
-        self.lblBig = BigLabel(self.data)
+        self.lblBig = BigLabel(self.data, self.logger)
         self.lblSmall = SmallLabel(self.data)
         self.data.setGuiElements(self.controlPanel, self.lblBig, self.lblSmall)
         self.controlPanel.txtBarcode.installEventFilter(self)

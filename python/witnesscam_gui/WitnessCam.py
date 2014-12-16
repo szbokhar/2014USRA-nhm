@@ -52,7 +52,7 @@ class WitnessCam(QtCore.QObject):
     STABLE_FRAME_DELTA_THRESHOLD = 0.4
     STABLE_FRAME_ACTION_THRESHOLD = 0.5
 
-    def __init__(self, logger):
+    def __init__(self, logger, tester):
         """Constructor.
 
         Keyword Arguments:
@@ -225,6 +225,7 @@ class WitnessCam(QtCore.QObject):
                 self.sigShowHint.emit(C.HINT_TRAYAREA_BADPOINT)
             else:
                 self.polyPoints.append(point)
+                self.logger.log('CLICK tray corner at %d %d' % (point.x, point.y), 0)
                 self.sigShowHint.emit(C.HINT_TRAYAREA_234)
 
                 if len(self.polyPoints) == 4:
@@ -741,6 +742,9 @@ class WitnessCam(QtCore.QObject):
 
         def nextStep(self):
             self.calibrationStage += 1
+            self.data.logger.log(
+                'BUTTONCLICK witnesscam calibration button. stage=%d'
+                % self.calibrationStage, 0)
             if self.calibrationStage == 1:
                 self.btnNext.setText(C.CALIBRATION_STAGE2)
                 self.diffValues = []
