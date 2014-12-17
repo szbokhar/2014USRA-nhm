@@ -192,6 +192,16 @@ A few of these are set at runtime by the calibration process.
   difference in the frame is less than STABLE_FRAME_ACTION_THRESHOLD, then
   don't take any action. That small difference is just considered to be noise.
 
+Regression Testing
+------------------
+A zip file containing two regression tests is available at
+[http://csclub.uwaterloo.ca/~szbokhar/bugtests.zip](http://csclub.uwaterloo.ca/~szbokhar/bugtests.zip).
+
+To run the tests pass the file into the main program as a command line option:
+```bash
+$ python2.7 main.py -t 1.test
+```
+
 ### Writing regression tests
 A test file describes a json object used for storing testing data:
 ```json
