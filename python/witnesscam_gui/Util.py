@@ -522,6 +522,12 @@ class BugBoxList:
     def __repr__(self):
         return str(self)
 
+    def getDict(self):
+        box_dict = dict()
+        for b in self.boxes:
+            box_dict[b.name] = b
+        return box_dict
+
     def delete(self, index):
         """Deletes the box at the index position from the list.
 
@@ -692,25 +698,38 @@ class TestingData:
         for [x,y] in self.traycorners:
             QtTest.QTest.mouseClick(
                 w.lblBig, QtCore.Qt.LeftButton, pos=QtCore.QPoint(x,y),
-                delay=500)
-
-        for t in self.calibration:
-            QtTest.QTest.mouseClick(
-                w.cvImpl.calibrate.btnNext, QtCore.Qt.LeftButton, delay=t)
+                delay=50)
 
         QtTest.QTest.mouseClick(
             w.lblBig, QtCore.Qt.LeftButton, delay=self.rununtil)
 
-        # w.data.exportToCSV(False)
+        w.data.exportToCSV(False)
 
-        current_boxes = w.data.bugBoxList
-        check_boxes = self.loadCSVBoxes(self.checkcsvfile)
-        print(current_boxes)
-        print(check_boxes)
+        current_boxes = w.data.bugBoxList.getDict()
+        check_boxes = self.loadCSVBoxes(self.checkcsvfile).getDict()
+
+        eps = 0.01
+        error = 0
+        for n in current_boxes.iterkeys():
+            (x1,y1,x2,y2) = current_boxes[n].static
+            if n not in check_boxes.keys():
+                print('No \'%s\' in verified list of boxes' % n)
+                error += 1
+            else:
+                (u1,v1,u2,v2) = check_boxes[n].static
+                w = abs(u2-u1)
+                h = abs(v2-v1)
+
+                if (abs(x1-u1) < w*eps and abs(x2-u2) < w*eps and
+                        abs(y1-v1) < h*eps and abs(y2-v2) < h*eps):
+                    print('\'%s\' matches' % n)
+                else:
+                    print('\'%s\' dont match' % n)
+                    error += 1
+        print('%d errors found in regression test' % error)
 
     def loadCSVBoxes(self, csv_fname):
         boxes = None
-        print(csv_fname)
         if os.path.isfile(csv_fname):
             with open(csv_fname) as csvfile:
                 reader = csv.reader(csvfile)

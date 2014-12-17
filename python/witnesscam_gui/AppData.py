@@ -47,7 +47,7 @@ class AppData(QtCore.QObject):
     CAM_MAX_WIDTH = 640
     CAM_MAX_HEIGHT = 480
     BOX_RESIZE_EDGE_PADDING = 15
-    FPS_TARGET = 60
+    FPS_TARGET = 30
 
     def __init__(self, win, cv_impl, logger, testdata=None):
         """Initializes member variables for use in later functions"""
@@ -186,14 +186,17 @@ class AppData(QtCore.QObject):
         """Begin the camera feed and set up the timer loop."""
 
         if not self.camOn:
-            if self.testdata is not None:
-                self.capture = cv2.VideoCapture(self.testdata.camfile)
-            else:
-                self.capture = cv2.VideoCapture(0)
-
             self.frameTimer = QtCore.QTimer()
             self.frameTimer.timeout.connect(self.grabNewCameraFrame)
-            self.frameTimer.start(1000/AppData.FPS_TARGET)
+
+            if self.testdata is not None:
+                self.capture = cv2.VideoCapture(self.testdata.camfile)
+                sourcefps = self.capture.get(cv2.cv.CV_CAP_PROP_FPS)
+                sourcefps = sourcefps if sourcefps != 0 else 30
+                self.frameTimer.start(1000/float(sourcefps))
+            else:
+                self.capture = cv2.VideoCapture(0)
+                self.frameTimer.start(1000/60)
 
             self.loopTimer = QtCore.QTimer()
             self.loopTimer.timeout.connect(self.getNewCameraFrame)
@@ -209,32 +212,32 @@ class AppData(QtCore.QObject):
         to on screen."""
 
         # Get new camera frame and downsample it
-        (_, self.cameraImage) = self.capture.retrieve()
-        if self.cameraImage is None:
-            print('No Frame')
-            return
-
-        while (self.cameraImage.shape[0] > AppData.CAM_MAX_HEIGHT or
-               self.cameraImage.shape[1] > AppData.CAM_MAX_WIDTH):
-            self.cameraImage = cv2.pyrDown(self.cameraImage)
-
         start_time = time()
+        (_, self.cameraImage) = self.capture.retrieve()
+        ts = self.capture.get(cv2.cv.CV_CAP_PROP_POS_MSEC)
+        if self.cameraImage is not None:
+            while (self.cameraImage.shape[0] > AppData.CAM_MAX_HEIGHT or
+                   self.cameraImage.shape[1] > AppData.CAM_MAX_WIDTH):
+                self.cameraImage = cv2.pyrDown(self.cameraImage)
 
-        # Process and modify the camera and static frames
-        (big_image, small_image, self.bugBoxList) = self.cvImpl.amendFrame(
-            self.cameraImage, self.trayImage, self.lblBig.imageScaleRatio,
-            self.lblSmall.imageScaleRatio, self.bugBoxList)
 
-        if self.cvImpl.allowEditing():
-            dB = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
-            self.draw_editing_ui(big_image, C.GREEN, C.RED, C.BLUE, dB)
+            # Process and modify the camera and static frames
+            (big_image, small_image, self.bugBoxList) = self.cvImpl.amendFrame(
+                self.cameraImage, self.trayImage, self.lblBig.imageScaleRatio,
+                self.lblSmall.imageScaleRatio, self.bugBoxList)
 
-        # Display the modified frame to the user
-        self.lblBig.setImage(big_image)
-        self.lblSmall.setImage(small_image)
+            if self.cvImpl.allowEditing():
+                dB = int(AppData.DRAW_DELTA/self.lblBig.imageScaleRatio)
+                self.draw_editing_ui(big_image, C.GREEN, C.RED, C.BLUE, dB)
+
+            # Display the modified frame to the user
+            self.lblBig.setImage(big_image)
+            self.lblSmall.setImage(small_image)
+        else:
+            print('No Frame')
 
         end_time = time()
-        self.loopTimer.start(max(0, 1.0/AppData.FPS_TARGET-(end_time-start_time)))
+        self.loopTimer.start(max(0, 1000.0/AppData.FPS_TARGET-(end_time-start_time)))
 
     def grabNewCameraFrame(self):
         self.capture.grab()

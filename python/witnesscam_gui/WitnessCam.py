@@ -63,6 +63,7 @@ class WitnessCam(QtCore.QObject):
         self.logger = logger
         self.mainWindow = None
         self.calibrate = None
+        self.testdata = tester
         self.reset()
 
     def setMainWindow(self, win):
@@ -658,13 +659,13 @@ class WitnessCam(QtCore.QObject):
 
         def __init__(self, data, parent=None):
             super(WitnessCam.CalibrationWindow, self).__init__(parent)
-            self.initUI()
 
             self.calibrationStage = 0
             self.data = data
             self.diffValues = []
             self.deltaValues = []
             self.closeable = False
+            self.initUI()
 
         def initUI(self):
             mainContent = QtGui.QGridLayout(self)
@@ -725,6 +726,17 @@ class WitnessCam(QtCore.QObject):
                 partial(self.textChanged, 0))
             self.txtDelta.textChanged.connect(partial(self.textChanged, 1))
             self.txtAction.textChanged.connect(partial(self.textChanged, 2))
+
+            if self.data.testdata is not None:
+                c = self.data.testdata.calibration
+                self.calibrationStage = 4
+                self.txtActDelayVal.setText(
+                    str(c['ACTION_DELAY']))
+                self.txtDelta.setText(
+                    str(c['STABLE_FRAME_DELTA_THRESHOLD']))
+                self.txtAction.setText(
+                    str(c['STABLE_FRAME_ACTION_THRESHOLD']))
+                self.nextStep()
 
             self.setGeometry(50, 50, 300, 600)
             self.setWindowTitle('Calibration')
@@ -792,15 +804,21 @@ class WitnessCam(QtCore.QObject):
             self.data.refreshCamera()
             if config == 0:
                 WitnessCam.ACTION_DELAY = int(val)
+                self.data.logger.log(
+                    'CALIBRATE set ACTION_DELAY to %d' % int(val))
                 self.lblStableRun.setThresholds(
                     [(WitnessCam.ACTION_DELAY, C.BLUE)])
                 self.lblStableBoxRun.setThresholds(
                     [(WitnessCam.ACTION_DELAY, C.BLUE)])
             elif config == 1:
                 WitnessCam.STABLE_FRAME_DELTA_THRESHOLD = float(val)
+                self.data.logger.log(
+                    'CALIBRATE set STABLE_FRAME_DELTA_THRESHOLD to %f' % float(val))
                 self.lblDiffVal.setThresholds(
                     [(WitnessCam.STABLE_FRAME_ACTION_THRESHOLD, C.BLUE)])
             elif config == 2:
                 WitnessCam.STABLE_FRAME_ACTION_THRESHOLD = float(val)
+                self.data.logger.log(
+                    'CALIBRATE set STABLE_FRAME_ACTION_THRESHOLD to %f' % float(val))
                 self.lblDeltaVal.setThresholds(
                     [(WitnessCam.STABLE_FRAME_DELTA_THRESHOLD, C.BLUE)])
