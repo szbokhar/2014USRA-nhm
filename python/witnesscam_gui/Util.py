@@ -698,7 +698,7 @@ class TestingData:
         for [x,y] in self.traycorners:
             QtTest.QTest.mouseClick(
                 w.lblBig, QtCore.Qt.LeftButton, pos=QtCore.QPoint(x,y),
-                delay=1000)
+                delay=100)
 
         QtTest.QTest.mouseClick(
             w.lblBig, QtCore.Qt.LeftButton, delay=self.rununtil)

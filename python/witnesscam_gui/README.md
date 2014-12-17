@@ -191,3 +191,49 @@ A few of these are set at runtime by the calibration process.
 - **STABLE_FRAME_ACTION_THRESHOLD**: (float greater than 0) If the total
   difference in the frame is less than STABLE_FRAME_ACTION_THRESHOLD, then
   don't take any action. That small difference is just considered to be noise.
+
+### Writing regression tests
+A test file describes a json object used for storing testing data:
+```json
+{
+    "automate": true,
+    "camfile": "1.mov",
+    "trayfile": "1.png",
+    "csvfile": "1.csv",
+    "check-csvfile": "1check.csv",
+    "traycorners": [
+        [118, 64],
+        [444, 51],
+        [519, 281],
+        [93, 316]
+    ],
+    "calibration": {
+        "ACTION_DELAY": 16,
+        "STABLE_FRAME_DELTA_THRESHOLD": 0.011825,
+        "STABLE_FRAME_ACTION_THRESHOLD": 0.114674
+    },
+    "rununtil": 60000
+}
+```
+
+The fields are:
+
+- **automate**: _Bool_ - Whether the full test should be run. If false, then
+  the video is substituted for the camera, but the full test is not run.
+  This can be useful when actually making new tests
+- **camfile**: _String_ - Path to the video file to substitute for the camera feed.
+- **trayfile**: _String_ - Tray image to load
+- **csvfile**: _Optional String_ - CSV boxes file
+- **check-csvfile**: _String_ - Expected CSV file that result of regression
+  test is checked against.
+- **traycorners**: _[[Int, Int]]_ - Coordinates of where the tray corners
+  are located, in order that they should be clicked
+- **calibration**: _Obj_ - Calibration values so the test does not need
+  to calibrate itself
+- **rununtil**: _Int_ - Running time of the test
+
+When writing tests, it is useful to set **automate** to false, and run
+the program like `$ python2.7 main.py -t new.test -l log.out` and go
+through the process yourself. Then inspect the log output to figure out
+what coordinates to use for the tray points, and what the calibration
+values should be.
