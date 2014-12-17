@@ -698,12 +698,12 @@ class TestingData:
         for [x,y] in self.traycorners:
             QtTest.QTest.mouseClick(
                 w.lblBig, QtCore.Qt.LeftButton, pos=QtCore.QPoint(x,y),
-                delay=50)
+                delay=1000)
 
         QtTest.QTest.mouseClick(
             w.lblBig, QtCore.Qt.LeftButton, delay=self.rununtil)
 
-        w.data.exportToCSV(False)
+        # w.data.exportToCSV(False)
 
         current_boxes = w.data.bugBoxList.getDict()
         check_boxes = self.loadCSVBoxes(self.checkcsvfile).getDict()
