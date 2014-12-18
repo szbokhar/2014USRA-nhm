@@ -708,7 +708,7 @@ class TestingData:
         current_boxes = w.data.bugBoxList.getDict()
         check_boxes = self.loadCSVBoxes(self.checkcsvfile).getDict()
 
-        eps = 0.01
+        eps = 0.05
         error = 0
         for n in current_boxes.iterkeys():
             (x1,y1,x2,y2) = current_boxes[n].static
