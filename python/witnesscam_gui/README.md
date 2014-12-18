@@ -20,6 +20,7 @@ support Python3.
 - OpenCV: [http://opencv.org/](http://opencv.org/)
 
 
+### Mac/Linux Setup
 On Mac these can be installed using MacPorts:
 ```bash
 $ sudo port install python27 py27-numpy py27-pyside
@@ -30,6 +31,33 @@ $ sudo port install opencv +python27
 On most linux distros, these packages should be available through the package
 manager, though the commands and package names will differ.
 
+### Windows Setup
+The same required packages are available on Windows 7, but need to be
+installed manually (downloaded with browser).
+
+1. Follow the direction [here](http://docs.opencv.org/trunk/doc/py_tutorials/py_setup/py_setup_in_windows/py_setup_in_windows.html)
+   to install Python2.7, Numpy, and OpenCV 2.0. You should not need Matplotlib.
+2. Follow the directions [here](http://qt-project.org/wiki/PySide_Binaries_Windows)
+   to install PySide, however I had some issues with these instructions.
+
+If you had some issues installing PySide, these directions might help.
+
+1. After installing pip with [get-pip.py](https://bootstrap.pypa.io/get-pip.py)
+   I wasn't able to run it in the commandline. The path to the script needs
+   to be added to the Windows PATH environment variable.
+2. To do this open up 'Control Panel > All Control Panel Items > System'.
+3. Click on 'Advanced system settings' on the left side of the window.
+4. Click on 'Environment Variables' near the bottom of the newly opened window.
+5. Locate the variable named 'PATH' in the list of System Varibales
+6. Add the path to the python scripts file to the list of paths in this environment
+   variable. For example, if you installed python in the default location
+   (C:\Python), then add 'C:\Python/Scripts;' to the list of directories
+7. Now you should be able to open up Command Prompt and install PySide by running
+   `> pip install -U pyside`
+
+Once everything is installed, you should be able to run the application. You
+can do this by double-clicking `main.py`. If you want to run it from the, you
+you might need to add 'C:\Python' to the PATH as well. 
 
 How to use
 ----------
@@ -41,35 +69,34 @@ $ python2.7 main.py <logfile>
 ```
 
 ### Load tray scan and setup
-Click **File > Load Tray Scan** to open an image of a tray, or drag and
-drop the image into the application window. This will also
-start the witness camera. Be sure that the witness camera is set as the default
-system camera, so that the application will automatically use the witness
-camera.
+Click **File > Load Tray Scan** to open an image of a tray, or drag and drop
+the image into the application window. This will also start the witness camera.
+Be sure that the witness camera is set as the default system camera, so that
+the application will automatically use the witness camera.
 
 The camera view will be displayed in the big box. Position the actual insect
 tray (corresponding to the loaded image) in clear view of the camera. Now click
 on the four corners of the tray in the camera view starting from the top left
-corner of the tray in the scanned image. This is very important. 
-Upon each click a small circle will be placed at each corner.
+corner of the tray in the scanned image. This is very important.  Upon each
+click a small circle will be placed at each corner.
 
 Once all four corners are clicked, the scan of the tray will be placed in the
 big box, and the camera view will be moved to the small box. In the small box,
 the outline of the tray area you selected will be shown with a blue trace.
 
 ### Calibration Phase
-One the tray area has been selected, a new window will pop up and ask you
-to calibrate the vision system. The instructions will be displayed on a button
-in the calibration window. Once the calibration is done, certain constants will
-be calculated (constants described at the end). You can still change the
-constants manually after calibration.
+One the tray area has been selected, a new window will pop up and ask you to
+calibrate the vision system. The instructions will be displayed on a button in
+the calibration window. Once the calibration is done, certain constants will be
+calculated (constants described at the end). You can still change the constants
+manually after calibration.
 
 
 ### Scanning process
-When you remove an insect from the tray and completely out of view of
-the camera, the system will determine which insect was removed, and mark it
-with a blue circle and X. This indicates that this is the removed insect. When
-this happens, you can modify the **ID** in the text box, and the changes will
+When you remove an insect from the tray and completely out of view of the
+camera, the system will determine which insect was removed, and mark it with a
+blue circle and X. This indicates that this is the removed insect. When this
+happens, you can modify the **ID** in the text box, and the changes will
 automatically be applied to that insect.
 
 If the barcode scanner is plugged in and can act as a keyboard device, then
@@ -112,8 +139,8 @@ section).
 
 Another option to fix recognition errors is to make sure all bugs are back on
 the tray, and make sure nothing is obscuring the view of the tray. Then click
-**Image > Refresh Camera**. This will recalibrate the background, and
-hopefully fix any errors.
+**Image > Refresh Camera**. This will recalibrate the background, and hopefully
+fix any errors.
 
 If you have a good understanding of the system internals, then it is also
 possible to manually change the configuration constants in the configuration
@@ -121,8 +148,8 @@ window.
 
 ### Exporting the scanned data
 The data from the scanning process can be exported at any time. By clicking
-**File > Export CSV**, a csv (comma separated value) file can be written. It could
-look something like this:
+**File > Export CSV**, a csv (comma separated value) file can be written. It
+could look something like this:
 
 ```
 BB 10011, 195, 397, 445, 975, 323, 681
@@ -152,9 +179,9 @@ This should only be done if the application is routinely under performing, such
 as mis-recognizing operators hand's for removed bugs, or if the camera is
 particularly noisy and a bug is never recognized as being removed.
 
-In **WitnessCam.py** starting at line 46, there are several constants used in the
-vision process. These control aspects such as error tolerance and waiting time.
-A few of these are set at runtime by the calibration process.
+In **WitnessCam.py** starting at line 46, there are several constants used in
+the vision process. These control aspects such as error tolerance and waiting
+time.  A few of these are set at runtime by the calibration process.
 
 - **ACTION_DELAY**: (integer greater than 1) The number of camera frames with
   no motion the algorithm waits for before taking the next action
@@ -231,7 +258,8 @@ The fields are:
 - **automate**: _Bool_ - Whether the full test should be run. If false, then
   the video is substituted for the camera, but the full test is not run.
   This can be useful when actually making new tests
-- **camfile**: _String_ - Path to the video file to substitute for the camera feed.
+- **camfile**: _String_ - Path to the video file to substitute for the camera
+  feed.
 - **trayfile**: _String_ - Tray image to load
 - **csvfile**: _Optional String_ - CSV boxes file
 - **check-csvfile**: _String_ - Expected CSV file that result of regression
@@ -242,8 +270,7 @@ The fields are:
   to calibrate itself
 - **rununtil**: _Int_ - Running time of the test
 
-When writing tests, it is useful to set **automate** to false, and run
-the program like `$ python2.7 main.py -t new.test -l log.out` and go
-through the process yourself. Then inspect the log output to figure out
-what coordinates to use for the tray points, and what the calibration
-values should be.
+When writing tests, it is useful to set **automate** to false, and run the
+program like `$ python2.7 main.py -t new.test -l log.out` and go through the
+process yourself. Then inspect the log output to figure out what coordinates to
+use for the tray points, and what the calibration values should be.
