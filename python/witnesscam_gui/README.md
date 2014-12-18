@@ -39,8 +39,14 @@ installed manually (downloaded with browser).
    to install Python2.7, Numpy, and OpenCV 2.0. You should not need Matplotlib.
 2. Follow the directions [here](http://qt-project.org/wiki/PySide_Binaries_Windows)
    to install PySide, however I had some issues with these instructions.
+3. In order to be able to run the regression tests (described at the end of
+   this README, you need to add FFMPEG to your path. If you installed OpenCV in
+   the default location, then add 'C:\opencv\sources\3rdparty\ffmpeg' to you
+   PATH.
 
-If you had some issues installing PySide, these directions might help.
+If you had some issues installing PySide, these directions might help. The
+issue I had was that pip was not added to the PATH. This directions describe
+how to update the PATH environment variable:
 
 1. After installing pip with [get-pip.py](https://bootstrap.pypa.io/get-pip.py)
    I wasn't able to run it in the commandline. The path to the script needs
@@ -57,7 +63,7 @@ If you had some issues installing PySide, these directions might help.
 
 Once everything is installed, you should be able to run the application. You
 can do this by double-clicking `main.py`. If you want to run it from the, you
-you might need to add 'C:\Python' to the PATH as well. 
+you might need to add 'C:\Python' to the PATH as well.
 
 How to use
 ----------
